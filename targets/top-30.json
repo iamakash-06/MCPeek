@@ -1,0 +1,242 @@
+[
+  {
+    "name": "modelcontextprotocol/servers",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 14200,
+    "language": "TypeScript",
+    "category": "reference",
+    "lastCommit": "2026-04-15"
+  },
+  {
+    "name": "modelcontextprotocol/typescript-sdk",
+    "url": "https://github.com/modelcontextprotocol/typescript-sdk",
+    "stars": 6800,
+    "language": "TypeScript",
+    "category": "sdk",
+    "lastCommit": "2026-04-18"
+  },
+  {
+    "name": "Zed-Industries/zed-mcp",
+    "url": "https://github.com/zed-industries/zed",
+    "stars": 5100,
+    "language": "TypeScript",
+    "category": "editor",
+    "lastCommit": "2026-04-16"
+  },
+  {
+    "name": "cline/mcp-server",
+    "url": "https://github.com/cline/cline",
+    "stars": 4800,
+    "language": "TypeScript",
+    "category": "code-assistant",
+    "lastCommit": "2026-04-14"
+  },
+  {
+    "name": "UpstageAI/mcp-servers",
+    "url": "https://github.com/upstageai/mcp",
+    "stars": 2100,
+    "language": "TypeScript",
+    "category": "ai-service",
+    "lastCommit": "2026-04-10"
+  },
+  {
+    "name": "wong2/mcp-cli",
+    "url": "https://github.com/wong2/mcp-cli",
+    "stars": 1950,
+    "language": "TypeScript",
+    "category": "tooling",
+    "lastCommit": "2026-03-28"
+  },
+  {
+    "name": "Anthropic/mcp-server-filesystem",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 1800,
+    "language": "TypeScript",
+    "category": "filesystem",
+    "lastCommit": "2026-04-12"
+  },
+  {
+    "name": "browserbase/mcp-server-browserbase",
+    "url": "https://github.com/browserbase/mcp-server-browserbase",
+    "stars": 1700,
+    "language": "TypeScript",
+    "category": "browser",
+    "lastCommit": "2026-04-08"
+  },
+  {
+    "name": "punkpeye/mcp-server-commands",
+    "url": "https://github.com/punkpeye/mcp-server-commands",
+    "stars": 1500,
+    "language": "TypeScript",
+    "category": "shell",
+    "lastCommit": "2026-03-20"
+  },
+  {
+    "name": "zcaceres/mcp-database",
+    "url": "https://github.com/zcaceres/mcp-database",
+    "stars": 1400,
+    "language": "TypeScript",
+    "category": "database",
+    "lastCommit": "2026-04-01"
+  },
+  {
+    "name": "mcp-server-git",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 1350,
+    "language": "TypeScript",
+    "category": "git",
+    "lastCommit": "2026-04-13"
+  },
+  {
+    "name": "github/github-mcp-server",
+    "url": "https://github.com/github/github-mcp-server",
+    "stars": 1300,
+    "language": "TypeScript",
+    "category": "github",
+    "lastCommit": "2026-04-17"
+  },
+  {
+    "name": "stripe/agent-toolkit",
+    "url": "https://github.com/stripe/agent-toolkit",
+    "stars": 1200,
+    "language": "TypeScript",
+    "category": "payment",
+    "lastCommit": "2026-04-05"
+  },
+  {
+    "name": "playwright-mcp",
+    "url": "https://github.com/microsoft/playwright-mcp",
+    "stars": 1150,
+    "language": "TypeScript",
+    "category": "browser",
+    "lastCommit": "2026-04-16"
+  },
+  {
+    "name": "tavily-mcp",
+    "url": "https://github.com/tavily-ai/tavily-mcp",
+    "stars": 1050,
+    "language": "TypeScript",
+    "category": "search",
+    "lastCommit": "2026-04-09"
+  },
+  {
+    "name": "fetch-mcp",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 1000,
+    "language": "TypeScript",
+    "category": "network",
+    "lastCommit": "2026-04-14"
+  },
+  {
+    "name": "exa-mcp-server",
+    "url": "https://github.com/exa-labs/exa-mcp-server",
+    "stars": 980,
+    "language": "TypeScript",
+    "category": "search",
+    "lastCommit": "2026-04-03"
+  },
+  {
+    "name": "supabase-mcp",
+    "url": "https://github.com/supabase-community/supabase-mcp",
+    "stars": 920,
+    "language": "TypeScript",
+    "category": "database",
+    "lastCommit": "2026-04-11"
+  },
+  {
+    "name": "linear-mcp",
+    "url": "https://github.com/linear/linear-mcp",
+    "stars": 880,
+    "language": "TypeScript",
+    "category": "project-management",
+    "lastCommit": "2026-03-25"
+  },
+  {
+    "name": "slack-mcp-server",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 860,
+    "language": "TypeScript",
+    "category": "communication",
+    "lastCommit": "2026-04-10"
+  },
+  {
+    "name": "notion-mcp-server",
+    "url": "https://github.com/makenotion/notion-sdk-js",
+    "stars": 820,
+    "language": "TypeScript",
+    "category": "productivity",
+    "lastCommit": "2026-04-07"
+  },
+  {
+    "name": "google-drive-mcp",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 790,
+    "language": "TypeScript",
+    "category": "storage",
+    "lastCommit": "2026-04-12"
+  },
+  {
+    "name": "mcp-server-sqlite",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 760,
+    "language": "TypeScript",
+    "category": "database",
+    "lastCommit": "2026-04-09"
+  },
+  {
+    "name": "mcp-server-postgres",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 740,
+    "language": "TypeScript",
+    "category": "database",
+    "lastCommit": "2026-04-08"
+  },
+  {
+    "name": "cloudflare-mcp-server",
+    "url": "https://github.com/cloudflare/mcp-server-cloudflare",
+    "stars": 720,
+    "language": "TypeScript",
+    "category": "cloud",
+    "lastCommit": "2026-04-15"
+  },
+  {
+    "name": "aws-mcp-server",
+    "url": "https://github.com/alexei-led/aws-mcp-server",
+    "stars": 700,
+    "language": "TypeScript",
+    "category": "cloud",
+    "lastCommit": "2026-03-30"
+  },
+  {
+    "name": "redis-mcp-server",
+    "url": "https://github.com/modelcontextprotocol/servers",
+    "stars": 680,
+    "language": "TypeScript",
+    "category": "database",
+    "lastCommit": "2026-04-06"
+  },
+  {
+    "name": "kubernetes-mcp-server",
+    "url": "https://github.com/strowk/mcp-k8s-go",
+    "stars": 650,
+    "language": "TypeScript",
+    "category": "devops",
+    "lastCommit": "2026-04-04"
+  },
+  {
+    "name": "docker-mcp-server",
+    "url": "https://github.com/ckreiling/mcp-server-docker",
+    "stars": 630,
+    "language": "TypeScript",
+    "category": "devops",
+    "lastCommit": "2026-03-22"
+  },
+  {
+    "name": "jira-mcp-server",
+    "url": "https://github.com/sooperset/mcp-atlassian",
+    "stars": 610,
+    "language": "TypeScript",
+    "category": "project-management",
+    "lastCommit": "2026-04-02"
+  }
+]
