@@ -11,7 +11,7 @@ import type { OutputFormat, Severity, Target, AuditResult } from "./types.js";
 const program = new Command();
 
 program
-  .name("mcp-audit")
+  .name("mcpeek")
   .description("Source-code security scanner for MCP server implementations")
   .version("1.0.0");
 
@@ -25,7 +25,7 @@ program
   .option("--ci", "CI mode: exit with code 1 if issues found")
   .option("--fail-on <severity>", "Minimum severity to trigger CI failure (critical|high|medium|low)", "high")
   .action(async (target: string, opts) => {
-    console.error(`[mcp-audit] Scanning ${target}...`);
+    console.error(`[mcpeek] Scanning ${target}...`);
 
     const rules = opts.rules?.split(",").map((r: string) => r.trim());
     const result = await scan(target, { rules });
@@ -36,7 +36,7 @@ program
     if (opts.output) {
       mkdirSync(dirname(opts.output), { recursive: true });
       writeFileSync(opts.output, output, "utf-8");
-      console.error(`[mcp-audit] Report written to ${opts.output}`);
+      console.error(`[mcpeek] Report written to ${opts.output}`);
     } else {
       process.stdout.write(output + "\n");
     }
@@ -63,7 +63,7 @@ program
     const { readFileSync } = await import("fs");
     const targets: Target[] = JSON.parse(readFileSync(opts.targets, "utf-8"));
 
-    console.error(`[mcp-audit] Starting audit of ${targets.length} servers...`);
+    console.error(`[mcpeek] Starting audit of ${targets.length} servers...`);
     mkdirSync(opts.output, { recursive: true });
 
     const results: AuditResult[] = [];
@@ -91,7 +91,7 @@ program
     const jsonReport = auditToJSON(results);
     writeFileSync(join(opts.output, "raw-results.json"), jsonReport, "utf-8");
 
-    console.error(`\n[mcp-audit] Audit complete. Reports written to ${opts.output}/`);
+    console.error(`\n[mcpeek] Audit complete. Reports written to ${opts.output}/`);
     printAuditSummary(results);
   });
 

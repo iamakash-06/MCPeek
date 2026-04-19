@@ -1,10 +1,10 @@
 {
-  "name": "mcp-audit",
+  "name": "mcpeek",
   "version": "1.0.0",
   "description": "Source-code-level security scanner for MCP server implementations",
   "type": "module",
   "bin": {
-    "mcp-audit": "./dist/cli.js"
+    "mcpeek": "./dist/cli.js"
   },
   "main": "./dist/scanner.js",
   "exports": {

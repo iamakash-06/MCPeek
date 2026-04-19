@@ -1,23 +1,23 @@
-# mcp-audit
+# MCPeek
 
 Source-code-level security scanner for MCP server implementations.
 
-Unlike config/runtime scanners, `mcp-audit` reads your source code and detects vulnerabilities at the AST level — understanding MCP SDK patterns like `server.tool()` handler flows.
+Unlike config/runtime scanners, `mcpeek` reads your source code and detects vulnerabilities at the AST level — understanding MCP SDK patterns like `server.tool()` handler flows.
 
 ## Quick start
 
 ```bash
 # Scan a GitHub repo
-npx mcp-audit scan https://github.com/org/your-mcp-server
+npx mcpeek scan https://github.com/org/your-mcp-server
 
 # Scan a local directory
-npx mcp-audit scan ./my-mcp-server
+npx mcpeek scan ./my-mcp-server
 
 # CI mode (exit 1 on high+ severity findings)
-npx mcp-audit scan ./my-server --ci --fail-on high
+npx mcpeek scan ./my-server --ci --fail-on high
 
 # Output as SARIF (GitHub Code Scanning compatible)
-npx mcp-audit scan ./my-server --format sarif --output findings.sarif
+npx mcpeek scan ./my-server --format sarif --output findings.sarif
 ```
 
 ## Detection rules
@@ -35,15 +35,15 @@ npx mcp-audit scan ./my-server --format sarif --output findings.sarif
 
 ```bash
 # Scan all servers in a targets file
-npx mcp-audit audit --targets targets/top-30.json --output results/
+npx mcpeek audit --targets targets/top-30.json --output results/
 ```
 
 ## Install
 
 ```bash
-npm install -g mcp-audit
+npm install -g mcpeek
 # or
-npx mcp-audit scan <target>
+npx mcpeek scan <target>
 ```
 
 ## License

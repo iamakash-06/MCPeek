@@ -19,9 +19,9 @@ export function toSARIF(result: ScanResult): string {
       {
         tool: {
           driver: {
-            name: "mcp-audit",
+            name: "mcpeek",
             version: "1.0.0",
-            informationUri: "https://github.com/anthropics/mcp-audit",
+            informationUri: "https://github.com/iamakash-06/MCPeek",
             rules,
           },
         },

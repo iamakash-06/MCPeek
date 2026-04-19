@@ -18,7 +18,7 @@ async function main() {
   const targets: Target[] = JSON.parse(readFileSync(targetsFile, "utf-8"));
   mkdirSync(outputDir, { recursive: true });
 
-  console.log(`\nmcp-audit batch scan`);
+  console.log(`\nmcpeek batch scan`);
   console.log(`Targets: ${targets.length} | Output: ${outputDir}/\n`);
 
   const results: AuditResult[] = [];

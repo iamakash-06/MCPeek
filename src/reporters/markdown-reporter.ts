@@ -12,7 +12,7 @@ export function toMarkdown(result: ScanResult): string {
   const { target, scannedAt, filesScanned, score, summary, findings } = result;
   const lines: string[] = [];
 
-  lines.push(`# mcp-audit Security Report`);
+  lines.push(`# MCPeek Security Report`);
   lines.push(`\n**Target:** \`${target}\``);
   lines.push(`**Scanned:** ${new Date(scannedAt).toUTCString()}`);
   lines.push(`**Files scanned:** ${filesScanned}`);
@@ -61,7 +61,7 @@ export function auditToMarkdown(results: AuditResult[]): string {
   const lines: string[] = [];
   const date = new Date().toUTCString();
 
-  lines.push(`# mcp-audit: MCP Server Security Audit Report`);
+  lines.push(`# MCPeek: MCP Server Security Audit Report`);
   lines.push(`\n*Generated: ${date}*\n`);
   lines.push(`## Overview\n`);
 

@@ -25,7 +25,7 @@ export async function fetchRepo(target: string): Promise<FetchResult> {
     return { path: target, cleanup: () => {}, isTemp: false };
   }
 
-  const tmpDir = mkdtempSync(join(tmpdir(), "mcp-audit-"));
+  const tmpDir = mkdtempSync(join(tmpdir(), "mcpeek-"));
 
   try {
     const git = simpleGit();
