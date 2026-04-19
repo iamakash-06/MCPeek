@@ -1,4 +1,6 @@
 import type { ScanResult, ScanOptions, Finding, Severity } from "./types.js";
+import { analyzeTypeScript } from "./analyzers/ts-analyzer.js";
+import { fetchRepo } from "./repo-fetcher.js";
 
 const SEVERITY_WEIGHT: Record<Severity, number> = {
   critical: 25,
@@ -12,21 +14,26 @@ export async function scan(
   target: string,
   options: ScanOptions = {}
 ): Promise<ScanResult> {
-  void options;
+  const { path, cleanup } = await fetchRepo(target);
 
-  const findings: Finding[] = [];
-  const summary = buildSummary(findings);
-  const score = calculateScore(findings);
+  try {
+    const { findings, filesScanned } = await analyzeTypeScript(path, options);
 
-  return {
-    target,
-    scannedAt: new Date().toISOString(),
-    language: "unknown",
-    filesScanned: 0,
-    findings,
-    score,
-    summary,
-  };
+    const summary = buildSummary(findings);
+    const score = calculateScore(findings);
+
+    return {
+      target,
+      scannedAt: new Date().toISOString(),
+      language: "typescript",
+      filesScanned,
+      findings,
+      score,
+      summary,
+    };
+  } finally {
+    cleanup();
+  }
 }
 
 function buildSummary(
