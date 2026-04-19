@@ -1,0 +1,44 @@
+{
+  "name": "mcp-audit",
+  "version": "1.0.0",
+  "description": "Source-code-level security scanner for MCP server implementations",
+  "type": "module",
+  "bin": {
+    "mcp-audit": "./dist/cli.js"
+  },
+  "main": "./dist/scanner.js",
+  "exports": {
+    ".": "./dist/scanner.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "mcp",
+    "security",
+    "scanner",
+    "sast",
+    "model-context-protocol",
+    "audit",
+    "vulnerability"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "commander": "^12.1.0",
+    "simple-git": "^3.27.0",
+    "ts-morph": "^24.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
