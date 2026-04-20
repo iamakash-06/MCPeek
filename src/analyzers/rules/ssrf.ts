@@ -54,6 +54,16 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
 
       if (!usesHandlerParam) continue;
 
+      if (
+        urlArg.getKind() === 97 /* TemplateExpression */ ||
+        urlText.startsWith("`")
+      ) {
+        const hardcodedBase =
+          /^`https?:\/\/[^$`]+\/\$\{/.test(urlText) ||
+          /^\`\$\{[A-Z_]+\}\//.test(urlText); // ${CONSTANT}/path
+        if (hardcodedBase) continue;
+      }
+
       // Check for URL validation (allowlist pattern)
       const blockText = handlerBody.getText();
       const hasAllowlist =
