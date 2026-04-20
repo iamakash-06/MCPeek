@@ -52,7 +52,8 @@ export async function analyzeTypeScript(
       !fp.includes("node_modules") &&
       !fp.includes("/dist/") &&
       !fp.includes("/build/") &&
-      !fp.endsWith(".d.ts")
+      !fp.endsWith(".d.ts") &&
+      !isTestFile(fp)
     );
   });
 
@@ -94,6 +95,24 @@ function runRule(
     case "ssrf":
       return detectSSRF(sourceFile);
   }
+}
+
+function isTestFile(fp: string): boolean {
+  return (
+    fp.endsWith(".test.ts") ||
+    fp.endsWith(".test.js") ||
+    fp.endsWith(".spec.ts") ||
+    fp.endsWith(".spec.js") ||
+    fp.includes("/__tests__/") ||
+    fp.includes("/test/") ||
+    fp.includes("/tests/") ||
+    fp.includes("/fixtures/") ||
+    fp.includes("/mocks/") ||
+    fp.includes("/mock/") ||
+    fp.endsWith("mocks.ts") ||
+    fp.endsWith("mock.ts") ||
+    fp.endsWith("fixtures.ts")
+  );
 }
 
 function findTsConfig(root: string): string | undefined {
