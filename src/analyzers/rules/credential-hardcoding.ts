@@ -18,6 +18,16 @@ const CREDENTIAL_VALUE_PATTERNS = [
 
 const MIN_SUSPICIOUS_LENGTH = 16;
 
+// Values that look like credentials but are obviously placeholders
+const PLACEHOLDER_PATTERNS = [
+  /^(dummy|fake|test|mock|example|sample|placeholder|replace|changeme|change.me|your.key|your.token|your.secret|todo|fixme|xxx+|yyy+|zzz+)/i,
+  /^<[^>]+>$/,           // <YOUR_KEY_HERE>
+  /^\[.+\]$/,            // [REPLACE_ME]
+  /will.be.replaced/i,
+  /at.least.\d+.bits/i,  // "a-string-secret-at-least-256-bits-long"
+  /^[a-z]+-[a-z]+-[a-z]+$/,  // test-client-secret, test-api-key style
+];
+
 export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
   const findings: Finding[] = [];
   const filePath = sourceFile.getFilePath();
@@ -44,6 +54,7 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
 
     const value = initializer.getText().replace(/['"` ]/g, "");
     if (value.length < MIN_SUSPICIOUS_LENGTH) continue;
+    if (isPlaceholder(value)) continue;
 
     const isKnownPattern = CREDENTIAL_VALUE_PATTERNS.some((p) =>
       p.test(value)
@@ -92,6 +103,7 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
 
     const value = initializer.getText().replace(/['"` ]/g, "");
     if (value.length < MIN_SUSPICIOUS_LENGTH) continue;
+    if (isPlaceholder(value)) continue;
 
     const isKnownPattern = CREDENTIAL_VALUE_PATTERNS.some((p) =>
       p.test(value)
@@ -117,6 +129,10 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
   }
 
   return findings;
+}
+
+function isPlaceholder(value: string): boolean {
+  return PLACEHOLDER_PATTERNS.some((p) => p.test(value));
 }
 
 function isProcessEnvAccess(node: Node): boolean {
