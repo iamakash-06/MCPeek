@@ -60,42 +60,56 @@ export function toMarkdown(result: ScanResult): string {
   return lines.join("\n");
 }
 
-export function auditToMarkdown(results: AuditResult[]): string {
+export function auditToMarkdown(
+  results: AuditResult[],
+  meta?: { attempted: number; failed: number }
+): string {
   const lines: string[] = [];
   const date = new Date().toUTCString();
+
+  // Only count repos where we actually found TypeScript files
+  const scannable = results.filter((r) => r.scan.language !== "unknown");
+  const unsupported = results.filter((r) => r.scan.language === "unknown");
 
   lines.push(`# MCPeek: MCP Server Security Audit Report`);
   lines.push(`\n*Generated: ${date}*\n`);
   lines.push(`## Overview\n`);
 
-  const totalFindings = results.reduce((s, r) => s + r.scan.findings.length, 0);
-  const criticalCount = results.reduce((s, r) => s + r.scan.summary.critical, 0);
-  const highCount = results.reduce((s, r) => s + r.scan.summary.high, 0);
-  const serversWithCritical = results.filter((r) => r.scan.summary.critical > 0).length;
-  const avgScore = Math.round(
-    results.reduce((s, r) => s + r.scan.score, 0) / results.length
-  );
+  const totalFindings = scannable.reduce((s, r) => s + r.scan.findings.length, 0);
+  const criticalCount = scannable.reduce((s, r) => s + r.scan.summary.critical, 0);
+  const highCount = scannable.reduce((s, r) => s + r.scan.summary.high, 0);
+  const serversWithCritical = scannable.filter((r) => r.scan.summary.critical > 0).length;
+  const avgScore = scannable.length
+    ? Math.round(scannable.reduce((s, r) => s + r.scan.score, 0) / scannable.length)
+    : 0;
 
   lines.push(`| Metric | Value |`);
   lines.push(`|--------|-------|`);
-  lines.push(`| Servers scanned | ${results.length} |`);
+  if (meta) {
+    lines.push(`| Servers attempted | ${meta.attempted} |`);
+    lines.push(`| Failed to clone | ${meta.failed} |`);
+  }
+  lines.push(`| Servers scanned (TypeScript) | ${scannable.length} |`);
+  if (unsupported.length > 0) {
+    lines.push(`| Skipped (no TypeScript files) | ${unsupported.length} |`);
+  }
   lines.push(`| Total findings | ${totalFindings} |`);
   lines.push(`| Critical findings | ${criticalCount} |`);
   lines.push(`| High findings | ${highCount} |`);
-  lines.push(`| Servers with critical issues | ${serversWithCritical} (${pct(serversWithCritical, results.length)}%) |`);
+  lines.push(`| Servers with critical issues | ${serversWithCritical} (${pct(serversWithCritical, scannable.length)}%) |`);
   lines.push(`| Average security score | ${avgScore}/100 |`);
 
   lines.push(`\n## Score Distribution\n`);
-  lines.push(buildScoreHistogram(results));
+  lines.push(buildScoreHistogram(scannable));
 
   lines.push(`\n## Findings by Rule\n`);
-  lines.push(buildRuleBreakdown(results));
+  lines.push(buildRuleBreakdown(scannable));
 
   lines.push(`\n## Per-Server Results\n`);
   lines.push(`| # | Server | Score | Critical | High | Medium |`);
   lines.push(`|---|--------|-------|----------|------|--------|`);
 
-  const sorted = [...results].sort((a, b) => a.scan.score - b.scan.score);
+  const sorted = [...scannable].sort((a, b) => a.scan.score - b.scan.score);
   sorted.forEach((r, i) => {
     const { name, url } = r.target;
     const { score, summary } = r.scan;
@@ -104,7 +118,13 @@ export function auditToMarkdown(results: AuditResult[]): string {
     );
   });
 
-  lines.push(`\n---\n*Responsible disclosure: Critical and high findings were reported to maintainers prior to publication.*`);
+  if (unsupported.length > 0) {
+    lines.push(`\n## Skipped — No TypeScript Files Found\n`);
+    lines.push(`These repos were cloned successfully but contained no TypeScript source files (likely Go, Python, or Rust).\n`);
+    unsupported.forEach((r) => {
+      lines.push(`- [${r.target.name}](${r.target.url})`);
+    });
+  }
 
   return lines.join("\n");
 }

@@ -25,7 +25,10 @@ export async function scan(
     return {
       target,
       scannedAt: new Date().toISOString(),
-      language: "typescript",
+      // Mark repos where we found no TypeScript files so callers can exclude
+      // them from aggregate metrics — a score of 100 for a Go/Python repo is
+      // misleading, not a clean bill of health.
+      language: filesScanned === 0 ? "unknown" : "typescript",
       filesScanned,
       findings,
       score,
