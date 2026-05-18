@@ -40,17 +40,39 @@ export function getTaintedNames(
     passes++;
 
     for (const decl of decls) {
-      const name = getDeclarationName(decl);
-      if (!name || tainted.has(name)) continue;
-
       const init = decl.getInitializer();
       if (!init) continue;
 
-      const match = findFirstTaintedIn(init, tainted);
-      if (match) {
+      const nameNode = (decl as any).getNameNode?.();
+      if (!nameNode) continue;
+
+      if (nameNode.getKind() === SyntaxKind.Identifier) {
+        // Simple: const x = taintedExpr
+        const name = nameNode.getText();
+        if (tainted.has(name)) continue;
+
+        const match = findFirstTaintedIn(init, tainted);
+        if (match) {
+          const line = decl.getStartLineNumber();
+          tainted.set(name, [...tainted.get(match)!, `${name} (line ${line})`]);
+          changed = true;
+        }
+      } else if (nameNode.getKind() === SyntaxKind.ObjectBindingPattern) {
+        // Destructuring: const { a, b: c } = taintedExpr
+        // If the initializer is tainted, all bound names inherit the taint.
+        const match = findFirstTaintedIn(init, tainted);
+        if (!match) continue;
+
         const line = decl.getStartLineNumber();
-        tainted.set(name, [...tainted.get(match)!, `${name} (line ${line})`]);
-        changed = true;
+        nameNode
+          .getDescendantsOfKind(SyntaxKind.BindingElement)
+          .forEach((el: any) => {
+            const elName = el.getNameNode?.()?.getText();
+            if (elName && !tainted.has(elName)) {
+              tainted.set(elName, [...tainted.get(match)!, `${elName} (line ${line})`]);
+              changed = true;
+            }
+          });
       }
     }
   }

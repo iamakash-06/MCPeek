@@ -59,6 +59,22 @@ describe("command-injection rule", () => {
     expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("execSync()");
   });
 
+  it("tracks taint through object destructuring (setRequestHandler pattern)", () => {
+    const sf = makeProject(`
+      server.setRequestHandler(CallToolRequestSchema, async (request) => {
+        const { arguments: args } = request.params;
+        const { command } = args;
+        execSync(command);
+        return { content: [] };
+      });
+    `);
+    const findings = detectCommandInjection(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].taintChain).toBeDefined();
+    expect(findings[0].taintChain![0]).toContain("handler param");
+    expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("execSync()");
+  });
+
   it("does NOT flag execSync with a hardcoded command", () => {
     const sf = makeProject(`
       server.tool("list", {}, async () => {
