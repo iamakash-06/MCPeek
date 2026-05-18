@@ -66,18 +66,11 @@ export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
         argText.startsWith("resolve(") ||
         argText.startsWith("normalize(");
 
-      // Check for boundary validation nearby (startsWith check in same block)
-      const blockText = handlerBody.getText();
-      const hasBoundaryCheck =
-        blockText.includes(".startsWith(") ||
-        blockText.includes("startsWith(") ||
-        blockText.includes("path.relative");
-
-      if (!hasSafeWrapper || !hasBoundaryCheck) {
+      if (!hasSafeWrapper) {
         const lineNum = call.getStartLineNumber();
         const chain = tainted.get(matchedName)!;
         const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
-        const severity = !hasSafeWrapper ? "high" : "medium";
+        const severity = "high";
 
         findings.push({
           rule: "mcp-path-traversal",
