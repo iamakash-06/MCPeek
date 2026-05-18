@@ -99,6 +99,7 @@ function runRule(
 
 function isTestFile(fp: string): boolean {
   return (
+    // Unit / integration tests
     fp.endsWith(".test.ts") ||
     fp.endsWith(".test.js") ||
     fp.endsWith(".spec.ts") ||
@@ -111,7 +112,19 @@ function isTestFile(fp: string): boolean {
     fp.includes("/mock/") ||
     fp.endsWith("mocks.ts") ||
     fp.endsWith("mock.ts") ||
-    fp.endsWith("fixtures.ts")
+    fp.endsWith("fixtures.ts") ||
+    // Documentation examples and guides — intentionally simplified code that
+    // does not follow production best-practices (e.g. missing Zod schemas)
+    fp.endsWith(".examples.ts") ||
+    fp.endsWith(".examples.js") ||
+    fp.includes("/examples/") ||
+    fp.includes("/example/") ||
+    fp.includes("/guides/") ||
+    fp.includes("/guide/") ||
+    fp.includes("/demo/") ||
+    fp.includes("/demos/") ||
+    fp.includes("/samples/") ||
+    fp.includes("/sample/")
   );
 }
 
