@@ -1,5 +1,6 @@
-import { SourceFile, SyntaxKind, VariableDeclaration, Node } from "ts-morph";
+import { SourceFile, SyntaxKind, Node } from "ts-morph";
 import type { Finding } from "../../types.js";
+import { extractSnippet } from "../snippet.js";
 
 const CREDENTIAL_NAME_PATTERN =
   /\b(api[_-]?key|apikey|secret|token|password|passwd|auth[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|bearer)\b/i;
@@ -65,6 +66,7 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
 
     const lineNum = decl.getStartLineNumber();
     const redacted = value.slice(0, 6) + "..." + value.slice(-4);
+    const { column } = sourceFile.getLineAndColumnAtPos(decl.getStart());
 
     findings.push({
       rule: "mcp-hardcoded-credential",
@@ -72,7 +74,7 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
       cwe: "CWE-798",
       file: filePath,
       line: lineNum,
-      column: 1,
+      column,
       message: `Hardcoded credential in variable "${name}" (value: ${redacted})`,
       evidence: extractSnippet(sourceFile, lineNum, 1),
       remediation:
@@ -112,6 +114,7 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
 
     const lineNum = prop.getStartLineNumber();
     const redacted = value.slice(0, 6) + "..." + value.slice(-4);
+    const { column } = sourceFile.getLineAndColumnAtPos(prop.getStart());
 
     findings.push({
       rule: "mcp-hardcoded-credential",
@@ -119,7 +122,7 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
       cwe: "CWE-798",
       file: filePath,
       line: lineNum,
-      column: 1,
+      column,
       message: `Hardcoded credential in property "${name}" (value: ${redacted})`,
       evidence: extractSnippet(sourceFile, lineNum, 1),
       remediation:
@@ -142,18 +145,4 @@ function isProcessEnvAccess(node: Node): boolean {
     text.includes("process.env.") ||
     text.startsWith("env.")
   );
-}
-
-function extractSnippet(
-  sourceFile: SourceFile,
-  lineNum: number,
-  context: number
-): string {
-  const lines = sourceFile.getFullText().split("\n");
-  const start = Math.max(0, lineNum - context - 1);
-  const end = Math.min(lines.length, lineNum + context);
-  return lines
-    .slice(start, end)
-    .map((l, i) => `${start + i + 1}: ${l}`)
-    .join("\n");
 }

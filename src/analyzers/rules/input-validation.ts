@@ -1,5 +1,6 @@
 import { SourceFile, SyntaxKind, CallExpression } from "ts-morph";
 import type { Finding } from "../../types.js";
+import { extractSnippet } from "../snippet.js";
 
 export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] {
   const findings: Finding[] = [];
@@ -30,13 +31,14 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
 
       if (isHandler) {
         const lineNum = call.getStartLineNumber();
+        const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
         findings.push({
           rule: "mcp-missing-input-validation",
           severity: "high",
           cwe: "CWE-20",
           file: filePath,
           line: lineNum,
-          column: 1,
+          column,
           message: "MCP tool registered without an input schema (no Zod validation)",
           evidence: extractSnippet(sourceFile, lineNum, 2),
           remediation:
@@ -54,13 +56,14 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
 
       if (schemaText.includes("z.any()") || schemaText.includes("z.unknown()")) {
         const lineNum = call.getStartLineNumber();
+        const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
         findings.push({
           rule: "mcp-weak-input-validation",
           severity: "medium",
           cwe: "CWE-20",
           file: filePath,
           line: lineNum,
-          column: 1,
+          column,
           message: "MCP tool uses z.any() or z.unknown() — schema provides no real validation",
           evidence: extractSnippet(sourceFile, lineNum, 2),
           remediation:
@@ -72,18 +75,4 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
   }
 
   return findings;
-}
-
-function extractSnippet(
-  sourceFile: SourceFile,
-  lineNum: number,
-  context: number
-): string {
-  const lines = sourceFile.getFullText().split("\n");
-  const start = Math.max(0, lineNum - context - 1);
-  const end = Math.min(lines.length, lineNum + context);
-  return lines
-    .slice(start, end)
-    .map((l, i) => `${start + i + 1}: ${l}`)
-    .join("\n");
 }

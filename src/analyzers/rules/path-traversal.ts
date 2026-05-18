@@ -1,6 +1,8 @@
-import { SourceFile, SyntaxKind, Node } from "ts-morph";
+import { SourceFile, SyntaxKind, Node, Identifier } from "ts-morph";
 import type { Finding } from "../../types.js";
-import { findMCPToolHandlers } from "./command-injection.js";
+import { getTaintedNames } from "../taint-tracker.js";
+import { findMCPToolHandlers } from "../mcp-handler.js";
+import { extractSnippet } from "../snippet.js";
 
 const FS_SINKS = new Set([
   "readFile",
@@ -29,16 +31,14 @@ const FS_SINKS = new Set([
   "renameSync",
 ]);
 
-
 export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
   const findings: Finding[] = [];
   const filePath = sourceFile.getFilePath();
 
-  const toolHandlers = findMCPToolHandlers(sourceFile);
-
-  for (const { paramNames, handlerBody } of toolHandlers) {
+  for (const { paramNames, handlerBody } of findMCPToolHandlers(sourceFile)) {
     if (!handlerBody || paramNames.length === 0) continue;
 
+    const tainted = getTaintedNames(handlerBody, paramNames);
     const calls = handlerBody.getDescendantsOfKind(SyntaxKind.CallExpression);
 
     for (const call of calls) {
@@ -53,11 +53,11 @@ export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
       const pathArg = args[0];
       const argText = pathArg.getText();
 
-      const usesHandlerParam = paramNames.some(
+      const matchedName = [...tainted.keys()].find(
         (p) => argText.includes(p) || containsIdentifier(pathArg, p)
       );
 
-      if (!usesHandlerParam) continue;
+      if (matchedName === undefined) continue;
 
       // Check if the path argument is wrapped in path.resolve or similar
       const hasSafeWrapper =
@@ -75,6 +75,8 @@ export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
 
       if (!hasSafeWrapper || !hasBoundaryCheck) {
         const lineNum = call.getStartLineNumber();
+        const chain = tainted.get(matchedName)!;
+        const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
         const severity = !hasSafeWrapper ? "high" : "medium";
 
         findings.push({
@@ -83,12 +85,13 @@ export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
           cwe: "CWE-22",
           file: filePath,
           line: lineNum,
-          column: 1,
+          column,
           message: `User-controlled path flows to ${funcName}() without proper boundary validation`,
           evidence: extractSnippet(sourceFile, lineNum, 3),
           remediation:
             "Use path.resolve(BASE_DIR, userInput) and verify the result starts with BASE_DIR before accessing the filesystem.",
           confidence: "high",
+          taintChain: [...chain, `${funcName}() (line ${lineNum})`],
         });
       }
     }
@@ -100,19 +103,5 @@ export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
 function containsIdentifier(node: Node, name: string): boolean {
   return node
     .getDescendantsOfKind(SyntaxKind.Identifier)
-    .some((id) => id.getText() === name);
-}
-
-function extractSnippet(
-  sourceFile: SourceFile,
-  lineNum: number,
-  context: number
-): string {
-  const lines = sourceFile.getFullText().split("\n");
-  const start = Math.max(0, lineNum - context - 1);
-  const end = Math.min(lines.length, lineNum + context);
-  return lines
-    .slice(start, end)
-    .map((l, i) => `${start + i + 1}: ${l}`)
-    .join("\n");
+    .some((id: Identifier) => id.getText() === name);
 }
