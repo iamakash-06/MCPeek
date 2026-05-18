@@ -12,6 +12,11 @@ export interface Finding {
   evidence: string;
   remediation: string;
   confidence: Confidence;
+  /** Step-by-step path from handler param to dangerous sink, e.g.
+   *  ["cmd (handler param)", "command (line 3)", "execSync() (line 5)"]
+   *  Only present for taint-tracked rules (command-injection, path-traversal, ssrf).
+   */
+  taintChain?: string[];
 }
 
 export interface ScanResult {
