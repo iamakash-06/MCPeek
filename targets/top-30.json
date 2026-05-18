@@ -8,14 +8,6 @@
     "lastCommit": "2026-04-15"
   },
   {
-    "name": "modelcontextprotocol/typescript-sdk",
-    "url": "https://github.com/modelcontextprotocol/typescript-sdk",
-    "stars": 6800,
-    "language": "TypeScript",
-    "category": "sdk",
-    "lastCommit": "2026-04-18"
-  },
-  {
     "name": "microsoft/playwright-mcp",
     "url": "https://github.com/microsoft/playwright-mcp",
     "stars": 5100,
@@ -128,22 +120,6 @@
     "lastCommit": "2026-03-28"
   },
   {
-    "name": "punkpeye/fastmcp",
-    "url": "https://github.com/punkpeye/fastmcp",
-    "stars": 920,
-    "language": "TypeScript",
-    "category": "framework",
-    "lastCommit": "2026-04-12"
-  },
-  {
-    "name": "ibraheem4/linear-mcp",
-    "url": "https://github.com/ibraheem4/linear-mcp",
-    "stars": 860,
-    "language": "TypeScript",
-    "category": "project-management",
-    "lastCommit": "2026-03-25"
-  },
-  {
     "name": "resend/resend-mcp",
     "url": "https://github.com/resend/resend-mcp",
     "stars": 820,
@@ -208,12 +184,20 @@
     "lastCommit": "2026-03-31"
   },
   {
-    "name": "punkpeye/mcp-proxy",
-    "url": "https://github.com/punkpeye/mcp-proxy",
-    "stars": 500,
+    "name": "crystaldba/postgres-mcp",
+    "url": "https://github.com/crystaldba/postgres-mcp",
+    "stars": 510,
     "language": "TypeScript",
-    "category": "tooling",
-    "lastCommit": "2026-04-05"
+    "category": "database",
+    "lastCommit": "2026-04-08"
+  },
+  {
+    "name": "cyanheads/filesystem-mcp-server",
+    "url": "https://github.com/cyanheads/filesystem-mcp-server",
+    "stars": 390,
+    "language": "TypeScript",
+    "category": "filesystem",
+    "lastCommit": "2026-04-01"
   },
   {
     "name": "sammcj/mcp-package-docs",
