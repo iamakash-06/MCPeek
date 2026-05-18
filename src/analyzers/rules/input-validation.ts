@@ -1,4 +1,4 @@
-import { SourceFile, SyntaxKind, CallExpression } from "ts-morph";
+import { SourceFile, SyntaxKind } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { extractSnippet } from "../snippet.js";
 
@@ -15,6 +15,7 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
     const isMCPRegistration =
       text.endsWith(".tool") ||
       text.endsWith(".addTool") ||
+      text.endsWith(".setRequestHandler") ||
       text === "server.tool";
 
     if (!isMCPRegistration) continue;
