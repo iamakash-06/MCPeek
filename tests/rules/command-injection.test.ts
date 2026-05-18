@@ -22,6 +22,9 @@ describe("command-injection rule", () => {
     expect(findings[0].rule).toBe("mcp-command-injection");
     expect(findings[0].severity).toBe("critical");
     expect(findings[0].cwe).toBe("CWE-78");
+    expect(findings[0].taintChain).toBeDefined();
+    expect(findings[0].taintChain![0]).toContain("handler param");
+    expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("execSync()");
   });
 
   it("detects spawn called with tool handler param", () => {
@@ -35,6 +38,25 @@ describe("command-injection rule", () => {
     const findings = detectCommandInjection(sf);
     expect(findings.length).toBeGreaterThanOrEqual(1);
     expect(findings[0].cwe).toBe("CWE-78");
+    expect(findings[0].taintChain).toBeDefined();
+    expect(findings[0].taintChain![0]).toContain("handler param");
+  });
+
+  it("tracks taint through variable aliases (multi-hop)", () => {
+    const sf = makeProject(`
+      server.tool("run", { scriptName: z.string() }, async ({ scriptName }) => {
+        const cmd = scriptName;
+        const full = \`./scripts/\${cmd}.sh\`;
+        execSync(full);
+        return { content: [] };
+      });
+    `);
+    const findings = detectCommandInjection(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].taintChain).toBeDefined();
+    expect(findings[0].taintChain!.length).toBeGreaterThanOrEqual(3);
+    expect(findings[0].taintChain![0]).toContain("handler param");
+    expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("execSync()");
   });
 
   it("does NOT flag execSync with a hardcoded command", () => {
