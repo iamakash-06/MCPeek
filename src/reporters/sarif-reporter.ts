@@ -65,7 +65,7 @@ function buildRuleDefinitions(findings: Finding[]) {
 function buildResult(f: Finding, target: string) {
   const relPath = f.file.replace(target, "").replace(/^\//, "");
 
-  return {
+  const result: Record<string, unknown> = {
     ruleId: f.rule,
     level: SEVERITY_LEVEL[f.severity],
     message: { text: f.message },
@@ -86,6 +86,41 @@ function buildResult(f: Finding, target: string) {
       remediation: f.remediation,
     },
   };
+
+  const codeFlows = buildCodeFlows(f, relPath);
+  if (codeFlows) result.codeFlows = codeFlows;
+
+  return result;
+}
+
+/**
+ * Maps taintChain steps to SARIF codeFlows so GitHub Code Scanning can
+ * render the full data-flow path in the Security tab.
+ *
+ * Each step label looks like one of:
+ *   "cmd (handler param)"   — no line number
+ *   "command (line 11)"     — carries a line number
+ *   "execSync() (line 12)"  — sink, carries a line number
+ */
+function buildCodeFlows(f: Finding, relPath: string) {
+  if (!f.taintChain || f.taintChain.length < 2) return undefined;
+
+  const locations = f.taintChain.map((step) => {
+    const lineMatch = step.match(/\(line (\d+)\)/);
+    const startLine = lineMatch ? parseInt(lineMatch[1], 10) : f.line;
+
+    return {
+      location: {
+        message: { text: step },
+        physicalLocation: {
+          artifactLocation: { uri: relPath },
+          region: { startLine },
+        },
+      },
+    };
+  });
+
+  return [{ threadFlows: [{ locations }] }];
 }
 
 function ruleIdToName(ruleId: string): string {
