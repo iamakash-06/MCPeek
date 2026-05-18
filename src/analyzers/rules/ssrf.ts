@@ -1,17 +1,8 @@
-import { SourceFile, SyntaxKind, Node } from "ts-morph";
+import { SourceFile, SyntaxKind, Node, Identifier } from "ts-morph";
 import type { Finding } from "../../types.js";
-import { findMCPToolHandlers } from "./command-injection.js";
-
-const HTTP_SINKS = new Set([
-  "fetch",
-  "get",
-  "post",
-  "put",
-  "delete",
-  "patch",
-  "request",
-  "head",
-]);
+import { getTaintedNames } from "../taint-tracker.js";
+import { findMCPToolHandlers } from "../mcp-handler.js";
+import { extractSnippet } from "../snippet.js";
 
 // axios.get, axios.post, http.request, https.request, got(), ky()
 const HTTP_CALLEE_PATTERNS = [
@@ -29,11 +20,10 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
   const findings: Finding[] = [];
   const filePath = sourceFile.getFilePath();
 
-  const toolHandlers = findMCPToolHandlers(sourceFile);
-
-  for (const { paramNames, handlerBody } of toolHandlers) {
+  for (const { paramNames, handlerBody } of findMCPToolHandlers(sourceFile)) {
     if (!handlerBody || paramNames.length === 0) continue;
 
+    const tainted = getTaintedNames(handlerBody, paramNames);
     const calls = handlerBody.getDescendantsOfKind(SyntaxKind.CallExpression);
 
     for (const call of calls) {
@@ -48,11 +38,11 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
       const urlArg = args[0];
       const urlText = urlArg.getText();
 
-      const usesHandlerParam = paramNames.some(
+      const matchedName = [...tainted.keys()].find(
         (p) => urlText.includes(p) || containsIdentifier(urlArg, p)
       );
 
-      if (!usesHandlerParam) continue;
+      if (matchedName === undefined) continue;
 
       if (
         urlArg.getKind() === 97 /* TemplateExpression */ ||
@@ -71,10 +61,12 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
         blockText.includes("allowedUrls") ||
         blockText.includes("ALLOWED_") ||
         blockText.includes(".startsWith('https://") ||
-        blockText.includes('new URL(') && blockText.includes('.hostname');
+        (blockText.includes("new URL(") && blockText.includes(".hostname"));
 
       if (!hasAllowlist) {
         const lineNum = call.getStartLineNumber();
+        const chain = tainted.get(matchedName)!;
+        const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
 
         findings.push({
           rule: "mcp-ssrf",
@@ -82,12 +74,13 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
           cwe: "CWE-918",
           file: filePath,
           line: lineNum,
-          column: 1,
+          column,
           message: `User-controlled URL flows to ${callText}() without host validation — potential SSRF`,
           evidence: extractSnippet(sourceFile, lineNum, 3),
           remediation:
             "Validate the URL against an allowlist of permitted hostnames. Use new URL(input) and check .hostname against known-safe values.",
           confidence: "high",
+          taintChain: [...chain, `${callText}() (line ${lineNum})`],
         });
       }
     }
@@ -99,19 +92,5 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
 function containsIdentifier(node: Node, name: string): boolean {
   return node
     .getDescendantsOfKind(SyntaxKind.Identifier)
-    .some((id) => id.getText() === name);
-}
-
-function extractSnippet(
-  sourceFile: SourceFile,
-  lineNum: number,
-  context: number
-): string {
-  const lines = sourceFile.getFullText().split("\n");
-  const start = Math.max(0, lineNum - context - 1);
-  const end = Math.min(lines.length, lineNum + context);
-  return lines
-    .slice(start, end)
-    .map((l, i) => `${start + i + 1}: ${l}`)
-    .join("\n");
+    .some((id: Identifier) => id.getText() === name);
 }
