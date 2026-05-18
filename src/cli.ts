@@ -67,6 +67,7 @@ program
     mkdirSync(opts.output, { recursive: true });
 
     const results: AuditResult[] = [];
+    const failedTargets: string[] = [];
     const rules = opts.rules?.split(",").map((r: string) => r.trim());
 
     for (let i = 0; i < targets.length; i++) {
@@ -81,6 +82,7 @@ program
         );
       } catch (err) {
         console.error(`  ✗ Failed: ${(err as Error).message}`);
+        failedTargets.push(target.name);
       }
 
       // Brief pause between clones to stay within GitHub's rate limits
@@ -89,11 +91,13 @@ program
       }
     }
 
+    const auditMeta = { attempted: targets.length, failed: failedTargets.length };
+
     // Write combined report
-    const mdReport = auditToMarkdown(results);
+    const mdReport = auditToMarkdown(results, auditMeta);
     writeFileSync(join(opts.output, "REPORT.md"), mdReport, "utf-8");
 
-    const jsonReport = auditToJSON(results);
+    const jsonReport = auditToJSON(results, auditMeta);
     writeFileSync(join(opts.output, "raw-results.json"), jsonReport, "utf-8");
 
     console.error(`\n[mcpeek] Audit complete. Reports written to ${opts.output}/`);
