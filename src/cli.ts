@@ -82,6 +82,11 @@ program
       } catch (err) {
         console.error(`  ✗ Failed: ${(err as Error).message}`);
       }
+
+      // Brief pause between clones to stay within GitHub's rate limits
+      if (i < targets.length - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
     }
 
     // Write combined report
