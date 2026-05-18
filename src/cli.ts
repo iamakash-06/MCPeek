@@ -129,13 +129,15 @@ function printSummary(result: ReturnType<typeof scan> extends Promise<infer R> ?
 }
 
 function printAuditSummary(results: AuditResult[]): void {
-  const total = results.reduce((s, r) => s + r.scan.findings.length, 0);
-  const critical = results.reduce((s, r) => s + r.scan.summary.critical, 0);
-  const high = results.reduce((s, r) => s + r.scan.summary.high, 0);
-  const avgScore = Math.round(
-    results.reduce((s, r) => s + r.scan.score, 0) / results.length
-  );
+  const scannable = results.filter((r) => r.scan.language !== "unknown");
+  const total = scannable.reduce((s, r) => s + r.scan.findings.length, 0);
+  const critical = scannable.reduce((s, r) => s + r.scan.summary.critical, 0);
+  const high = scannable.reduce((s, r) => s + r.scan.summary.high, 0);
+  const avgScore = scannable.length
+    ? Math.round(scannable.reduce((s, r) => s + r.scan.score, 0) / scannable.length)
+    : 0;
+  const skipped = results.length - scannable.length;
   console.error(
-    `Servers: ${results.length} | Total findings: ${total} | Critical: ${critical} | High: ${high} | Avg score: ${avgScore}/100`
+    `Servers: ${scannable.length}${skipped > 0 ? ` (${skipped} skipped — no TS files)` : ""} | Total findings: ${total} | Critical: ${critical} | High: ${high} | Avg score: ${avgScore}/100`
   );
 }
