@@ -8,7 +8,14 @@
  *   server.addTool(...)                  — community wrapper libraries
  */
 
-import { SourceFile, SyntaxKind, Node } from "ts-morph";
+import {
+  SourceFile,
+  SyntaxKind,
+  Node,
+  ArrowFunction,
+  FunctionExpression,
+  BindingElement,
+} from "ts-morph";
 
 export interface MCPToolHandler {
   paramNames: string[];
@@ -38,9 +45,8 @@ export function findMCPToolHandlers(sourceFile: SourceFile): MCPToolHandler[] {
     // server.tool(name, handler)          → args[1] is handler
     // server.tool(name, schema, handler)  → args[2] is handler
     const lastArg = args[args.length - 1];
-    const handlerFn =
-      lastArg.getKind() === SyntaxKind.ArrowFunction ||
-      lastArg.getKind() === SyntaxKind.FunctionExpression
+    const handlerFn: ArrowFunction | FunctionExpression | undefined =
+      Node.isArrowFunction(lastArg) || Node.isFunctionExpression(lastArg)
         ? lastArg
         : undefined;
 
@@ -48,7 +54,7 @@ export function findMCPToolHandlers(sourceFile: SourceFile): MCPToolHandler[] {
 
     // MCP handlers receive a single destructured input object as their first param.
     // Slice to 1 to avoid treating the SDK context object as user-controlled input.
-    const params = handlerFn.getDescendantsOfKind(SyntaxKind.Parameter);
+    const params = handlerFn.getParameters();
     const paramNames: string[] = [];
 
     for (const param of params.slice(0, 1)) {
@@ -56,7 +62,7 @@ export function findMCPToolHandlers(sourceFile: SourceFile): MCPToolHandler[] {
       if (binding.getKind() === SyntaxKind.ObjectBindingPattern) {
         binding
           .getDescendantsOfKind(SyntaxKind.BindingElement)
-          .forEach((el) => {
+          .forEach((el: BindingElement) => {
             const nameNode = el.getNameNode();
             if (nameNode) paramNames.push(nameNode.getText());
           });
@@ -65,10 +71,11 @@ export function findMCPToolHandlers(sourceFile: SourceFile): MCPToolHandler[] {
       }
     }
 
-    const body =
-      handlerFn.getDescendantsOfKind(SyntaxKind.Block)[0] ?? handlerFn;
+    const body = handlerFn.getBody();
+    const handlerBody =
+      body && body.getKind() === SyntaxKind.Block ? body : body ?? handlerFn;
 
-    results.push({ paramNames, handlerBody: body });
+    results.push({ paramNames, handlerBody });
   }
 
   return results;

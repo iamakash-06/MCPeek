@@ -52,9 +52,8 @@ export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
 
       const pathArg = args[0];
       const argText = pathArg.getText();
-
-      const matchedName = [...tainted.keys()].find(
-        (p) => argText.includes(p) || containsIdentifier(pathArg, p)
+      const matchedName = [...tainted.keys()].find((p) =>
+        containsIdentifier(pathArg, p)
       );
 
       if (matchedName === undefined) continue;
@@ -94,6 +93,10 @@ export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
 }
 
 function containsIdentifier(node: Node, name: string): boolean {
+  if (node.getKind() === SyntaxKind.Identifier && node.getText() === name) {
+    return true;
+  }
+
   return node
     .getDescendantsOfKind(SyntaxKind.Identifier)
     .some((id: Identifier) => id.getText() === name);

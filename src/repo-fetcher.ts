@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, existsSync } from "fs";
+import { mkdtempSync, rmSync, existsSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { simpleGit } from "simple-git";
@@ -16,16 +16,22 @@ export function isGitHubUrl(input: string): boolean {
   return GITHUB_URL_RE.test(input);
 }
 
-/**
- * Returns an authenticated clone URL when GITHUB_TOKEN is present in the
- * environment. Avoids anonymous rate-limits when scanning many repos in batch.
- */
 function buildCloneUrl(url: string): string {
-  const token = process.env.GITHUB_TOKEN;
-  if (token) {
-    return url.replace("https://github.com/", `https://${token}@github.com/`);
-  }
+  // Keep URLs token-free; auth is injected via git environment when available.
   return url;
+}
+
+function buildGitEnvForClone(url: string): NodeJS.ProcessEnv {
+  const token = process.env.GITHUB_TOKEN;
+  if (!token || !isGitHubUrl(url)) return {};
+
+  const basicAuth = Buffer.from(`x-access-token:${token}`).toString("base64");
+  return {
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "http.https://github.com/.extraheader",
+    GIT_CONFIG_VALUE_0: `AUTHORIZATION: basic ${basicAuth}`,
+    GIT_TERMINAL_PROMPT: "0",
+  };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -62,10 +68,12 @@ export async function fetchRepo(target: string): Promise<FetchResult> {
 
   try {
     const cloneUrl = buildCloneUrl(target);
-    const git = simpleGit();
-    await withRetry(() =>
-      git.clone(cloneUrl, tmpDir, ["--depth", "1", "--single-branch"])
-    );
+    const git = simpleGit().env(buildGitEnvForClone(target));
+    await withRetry(async () => {
+      rmSync(tmpDir, { recursive: true, force: true });
+      mkdirSync(tmpDir, { recursive: true });
+      await git.clone(cloneUrl, tmpDir, ["--depth", "1", "--single-branch"]);
+    });
   } catch (err) {
     rmSync(tmpDir, { recursive: true, force: true });
     throw new Error(`Failed to clone ${target}: ${(err as Error).message}`);

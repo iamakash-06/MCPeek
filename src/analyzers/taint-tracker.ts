@@ -99,9 +99,9 @@ export function getTaintedNames(
  * or undefined if none match.
  */
 export function findFirstTaintedIn(node: Node, tainted: TaintMap): string | undefined {
-  const text = node.getText();
+  const identifiers = getIdentifierTexts(node);
   for (const name of tainted.keys()) {
-    if (text.includes(name)) return name;
+    if (identifiers.has(name)) return name;
   }
   return undefined;
 }
@@ -110,11 +110,24 @@ export function findFirstTaintedIn(node: Node, tainted: TaintMap): string | unde
  * Returns true if the node's text contains any name from the tainted set.
  */
 export function nodeContainsTainted(node: Node, tainted: Set<string>): boolean {
-  const text = node.getText();
+  const identifiers = getIdentifierTexts(node);
   for (const name of tainted) {
-    if (text.includes(name)) return true;
+    if (identifiers.has(name)) return true;
   }
   return false;
+}
+
+function getIdentifierTexts(node: Node): Set<string> {
+  const names = new Set<string>();
+  if (node.getKind() === SyntaxKind.Identifier) {
+    names.add(node.getText());
+  }
+
+  node
+    .getDescendantsOfKind(SyntaxKind.Identifier)
+    .forEach((id) => names.add(id.getText()));
+
+  return names;
 }
 
 function getDeclarationName(
