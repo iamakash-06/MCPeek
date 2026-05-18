@@ -45,7 +45,7 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
       if (matchedName === undefined) continue;
 
       if (
-        urlArg.getKind() === 97 /* TemplateExpression */ ||
+        urlArg.getKind() === SyntaxKind.TemplateExpression ||
         urlText.startsWith("`")
       ) {
         const hardcodedBase =
