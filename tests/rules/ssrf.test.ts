@@ -20,6 +20,9 @@ describe("ssrf rule", () => {
     expect(findings.length).toBeGreaterThanOrEqual(1);
     expect(findings[0].rule).toBe("mcp-ssrf");
     expect(findings[0].cwe).toBe("CWE-918");
+    expect(findings[0].taintChain).toBeDefined();
+    expect(findings[0].taintChain![0]).toContain("handler param");
+    expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("fetch()");
   });
 
   it("detects axios.get with user-supplied URL", () => {

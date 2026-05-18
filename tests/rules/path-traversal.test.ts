@@ -20,6 +20,9 @@ describe("path-traversal rule", () => {
     expect(findings.length).toBeGreaterThanOrEqual(1);
     expect(findings[0].rule).toBe("mcp-path-traversal");
     expect(findings[0].cwe).toBe("CWE-22");
+    expect(findings[0].taintChain).toBeDefined();
+    expect(findings[0].taintChain![0]).toContain("handler param");
+    expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("readFileSync()");
   });
 
   it("detects writeFileSync with user-supplied path", () => {
