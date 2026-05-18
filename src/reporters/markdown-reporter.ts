@@ -47,6 +47,9 @@ export function toMarkdown(result: ScanResult): string {
       lines.push(`**File:** \`${relativePath(f.file, target)}\` line ${f.line}`);
       lines.push(`**Confidence:** ${f.confidence}`);
       lines.push(`\n${f.message}\n`);
+      if (f.taintChain && f.taintChain.length > 1) {
+        lines.push(`**Taint chain:** ${f.taintChain.map((s) => `\`${s}\``).join(" → ")}\n`);
+      }
       lines.push("```");
       lines.push(f.evidence);
       lines.push("```");
