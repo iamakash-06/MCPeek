@@ -36,10 +36,8 @@ export function detectCommandInjection(sourceFile: SourceFile): Finding[] {
       if (args.length === 0) continue;
 
       const firstArg = args[0];
-      const argText = firstArg.getText();
-
-      const matchedName = [...tainted.keys()].find(
-        (p) => argText.includes(p) || containsIdentifier(firstArg, p)
+      const matchedName = [...tainted.keys()].find((p) =>
+        containsIdentifier(firstArg, p)
       );
 
       if (matchedName !== undefined) {
@@ -69,6 +67,10 @@ export function detectCommandInjection(sourceFile: SourceFile): Finding[] {
 }
 
 function containsIdentifier(node: Node, name: string): boolean {
+  if (node.getKind() === SyntaxKind.Identifier && node.getText() === name) {
+    return true;
+  }
+
   return node
     .getDescendantsOfKind(SyntaxKind.Identifier)
     .some((id: Identifier) => id.getText() === name);

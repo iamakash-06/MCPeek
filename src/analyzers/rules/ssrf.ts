@@ -38,8 +38,8 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
       const urlArg = args[0];
       const urlText = urlArg.getText();
 
-      const matchedName = [...tainted.keys()].find(
-        (p) => urlText.includes(p) || containsIdentifier(urlArg, p)
+      const matchedName = [...tainted.keys()].find((p) =>
+        containsIdentifier(urlArg, p)
       );
 
       if (matchedName === undefined) continue;
@@ -90,6 +90,10 @@ export function detectSSRF(sourceFile: SourceFile): Finding[] {
 }
 
 function containsIdentifier(node: Node, name: string): boolean {
+  if (node.getKind() === SyntaxKind.Identifier && node.getText() === name) {
+    return true;
+  }
+
   return node
     .getDescendantsOfKind(SyntaxKind.Identifier)
     .some((id: Identifier) => id.getText() === name);
