@@ -23,6 +23,14 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
     const args = call.getArguments();
     if (args.length < 2) continue;
 
+    // setRequestHandler('initialize', handler) and similar calls where the
+    // first arg is a plain string are SDK-internal protocol handlers, not user
+    // tool registrations — skip them to avoid false positives in SDK source.
+    if (
+      text.endsWith(".setRequestHandler") &&
+      args[0].getKind() === SyntaxKind.StringLiteral
+    ) continue;
+
     // server.tool(name, handler) — missing schema entirely
     if (args.length === 2) {
       const secondArg = args[1];
