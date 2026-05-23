@@ -24,15 +24,22 @@ describe("sql-injection rule", () => {
     expect(findings[0].taintChain).toBeDefined();
   });
 
-  it("flags prisma.$queryRaw tagged template with tainted var", () => {
+  it("does NOT flag prisma.$queryRaw tagged template (Prisma escapes interpolations)", () => {
     const sf = makeProject(`
       server.tool("findUser", { id: z.string() }, async ({ id }) => {
         return await prisma.$queryRaw\`SELECT * FROM "User" WHERE id = \${id}\`;
       });
     `);
-    const findings = detectSqlInjection(sf);
-    expect(findings).toHaveLength(1);
-    expect(findings[0].message).toContain("$queryRaw");
+    expect(detectSqlInjection(sf)).toHaveLength(0);
+  });
+
+  it("does NOT flag prisma.$executeRaw tagged template (same Prisma escape rule)", () => {
+    const sf = makeProject(`
+      server.tool("upd", { id: z.string() }, async ({ id }) => {
+        return await prisma.$executeRaw\`UPDATE u SET active = true WHERE id = \${id}\`;
+      });
+    `);
+    expect(detectSqlInjection(sf)).toHaveLength(0);
   });
 
   it("flags $queryRawUnsafe call with tainted string", () => {
