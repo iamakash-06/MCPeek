@@ -8,6 +8,7 @@ import { detectHardcodedCredentials } from "./rules/credential-hardcoding.js";
 import { detectPathTraversal } from "./rules/path-traversal.js";
 import { detectSSRF } from "./rules/ssrf.js";
 import { detectWeakSchemaBounds } from "./rules/weak-schema-bounds.js";
+import { detectToolPoisoning } from "./rules/tool-poisoning.js";
 
 export type RuleName =
   | "command-injection"
@@ -15,7 +16,8 @@ export type RuleName =
   | "credential-hardcoding"
   | "path-traversal"
   | "ssrf"
-  | "weak-schema-bounds";
+  | "weak-schema-bounds"
+  | "tool-poisoning";
 
 export const ALL_RULES: RuleName[] = [
   "command-injection",
@@ -24,6 +26,7 @@ export const ALL_RULES: RuleName[] = [
   "path-traversal",
   "ssrf",
   "weak-schema-bounds",
+  "tool-poisoning",
 ];
 
 export interface AnalyzeResult {
@@ -99,6 +102,8 @@ function runRule(
       return detectSSRF(sourceFile);
     case "weak-schema-bounds":
       return detectWeakSchemaBounds(sourceFile);
+    case "tool-poisoning":
+      return detectToolPoisoning(sourceFile);
   }
 }
 
