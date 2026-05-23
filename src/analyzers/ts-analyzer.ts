@@ -10,6 +10,7 @@ import { detectSSRF } from "./rules/ssrf.js";
 import { detectWeakSchemaBounds } from "./rules/weak-schema-bounds.js";
 import { detectToolPoisoning } from "./rules/tool-poisoning.js";
 import { detectSqlInjection } from "./rules/sql-injection.js";
+import { detectCodeInjection } from "./rules/code-injection.js";
 
 export type RuleName =
   | "command-injection"
@@ -19,7 +20,8 @@ export type RuleName =
   | "ssrf"
   | "weak-schema-bounds"
   | "tool-poisoning"
-  | "sql-injection";
+  | "sql-injection"
+  | "code-injection";
 
 export const ALL_RULES: RuleName[] = [
   "command-injection",
@@ -30,6 +32,7 @@ export const ALL_RULES: RuleName[] = [
   "weak-schema-bounds",
   "tool-poisoning",
   "sql-injection",
+  "code-injection",
 ];
 
 export interface AnalyzeResult {
@@ -109,6 +112,8 @@ function runRule(
       return detectToolPoisoning(sourceFile);
     case "sql-injection":
       return detectSqlInjection(sourceFile);
+    case "code-injection":
+      return detectCodeInjection(sourceFile);
   }
 }
 
