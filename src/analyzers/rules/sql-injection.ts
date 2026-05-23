@@ -104,6 +104,11 @@ function checkTaggedTemplate(
   const funcName = tagText.split(".").pop() ?? tagText;
   if (!SQL_SINKS.has(funcName)) return undefined;
 
+  // Prisma's $queryRaw / $executeRaw automatically parameterise interpolated
+  // values when used as tagged templates. Only the *Unsafe variants are
+  // dangerous in this position.
+  if (funcName === "$queryRaw" || funcName === "$executeRaw") return undefined;
+
   const template = node.getTemplate();
   const matchedName = [...tainted.keys()].find((p) => containsIdentifier(template, p));
   if (matchedName === undefined) return undefined;
