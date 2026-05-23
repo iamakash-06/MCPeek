@@ -116,6 +116,27 @@ describe("weak-schema-bounds rule", () => {
     expect(detectWeakSchemaBounds(sf)).toHaveLength(2);
   });
 
+  it("resolves schema passed as a variable reference", () => {
+    const sf = makeProject(`
+      const userSchema = { name: z.string() };
+      server.tool("uses-var", userSchema, async () => ({ content: [] }));
+    `);
+    const findings = detectWeakSchemaBounds(sf);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].message).toContain("name");
+  });
+
+  it("follows an alias chain (const a = obj; const b = a;) to the schema", () => {
+    const sf = makeProject(`
+      const base = { q: z.string() };
+      const aliased = base;
+      server.tool("aliased", aliased, async () => ({ content: [] }));
+    `);
+    const findings = detectWeakSchemaBounds(sf);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].message).toContain("q");
+  });
+
   it("lists multiple weak fields in one finding", () => {
     const sf = makeProject(`
       server.tool("multi", { a: z.string(), b: z.number() }, async () => ({ content: [] }));
