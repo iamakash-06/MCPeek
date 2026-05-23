@@ -7,13 +7,15 @@ import { detectMissingInputValidation } from "./rules/input-validation.js";
 import { detectHardcodedCredentials } from "./rules/credential-hardcoding.js";
 import { detectPathTraversal } from "./rules/path-traversal.js";
 import { detectSSRF } from "./rules/ssrf.js";
+import { detectWeakSchemaBounds } from "./rules/weak-schema-bounds.js";
 
 export type RuleName =
   | "command-injection"
   | "input-validation"
   | "credential-hardcoding"
   | "path-traversal"
-  | "ssrf";
+  | "ssrf"
+  | "weak-schema-bounds";
 
 export const ALL_RULES: RuleName[] = [
   "command-injection",
@@ -21,6 +23,7 @@ export const ALL_RULES: RuleName[] = [
   "credential-hardcoding",
   "path-traversal",
   "ssrf",
+  "weak-schema-bounds",
 ];
 
 export interface AnalyzeResult {
@@ -94,6 +97,8 @@ function runRule(
       return detectPathTraversal(sourceFile);
     case "ssrf":
       return detectSSRF(sourceFile);
+    case "weak-schema-bounds":
+      return detectWeakSchemaBounds(sourceFile);
   }
 }
 
