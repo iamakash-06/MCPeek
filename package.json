@@ -55,7 +55,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "commander": "^12.1.0",
+    "commander": "^14.0.3",
     "simple-git": "^3.27.0",
     "ts-morph": "^24.0.0"
   },
