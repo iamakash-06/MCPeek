@@ -130,17 +130,3 @@ function getIdentifierTexts(node: Node): Set<string> {
   return names;
 }
 
-function getDeclarationName(
-  decl: ReturnType<Node["getDescendantsOfKind"]>[0]
-): string | undefined {
-  try {
-    const nameNode = (decl as any).getNameNode?.();
-    if (!nameNode) return undefined;
-    if (nameNode.getKind() === SyntaxKind.Identifier) {
-      return nameNode.getText();
-    }
-    return undefined;
-  } catch {
-    return undefined;
-  }
-}
