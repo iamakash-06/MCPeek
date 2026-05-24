@@ -1,5 +1,9 @@
 # MCPeek
 
+[![npm version](https://img.shields.io/npm/v/mcpeek.svg)](https://www.npmjs.com/package/mcpeek)
+[![npm downloads](https://img.shields.io/npm/dm/mcpeek.svg)](https://www.npmjs.com/package/mcpeek)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
 Source-code security scanner for MCP (Model Context Protocol) server implementations.
 
 Unlike config/runtime scanners, `mcpeek` reads your source code and detects vulnerabilities at the AST level — understanding MCP SDK patterns like `server.tool()` and `server.setRequestHandler()` and tracking taint from handler parameters to dangerous sinks.
@@ -59,6 +63,31 @@ The bundled `targets/top-30.json` lists verified TypeScript MCP servers and is w
 npm install -g mcpeek
 # or one-shot
 npx mcpeek scan <target>
+```
+
+## Use in CI
+
+Add MCPeek to any GitHub repo with the [MCPeek Action](https://github.com/iamakash-06/mcpeek-action):
+
+```yaml
+- uses: iamakash-06/mcpeek-action@v1
+  with:
+    target: .
+    fail-on: high
+```
+
+To upload findings to GitHub Code Scanning:
+
+```yaml
+- uses: iamakash-06/mcpeek-action@v1
+  id: mcpeek
+  with:
+    format: sarif
+    output: mcpeek.sarif
+- uses: github/codeql-action/upload-sarif@v3
+  if: always()
+  with:
+    sarif_file: ${{ steps.mcpeek.outputs.report }}
 ```
 
 ## License
