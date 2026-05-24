@@ -1,19 +1,24 @@
 #!/usr/bin/env node
 import { Command } from "commander";
-import { writeFileSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname, join } from "path";
+import { fileURLToPath } from "url";
 import { scan, hasCriticalOrHighFindings } from "./scanner.js";
 import { toJSON, auditToJSON } from "./reporters/json-reporter.js";
 import { toMarkdown, auditToMarkdown } from "./reporters/markdown-reporter.js";
 import { toSARIF } from "./reporters/sarif-reporter.js";
 import type { OutputFormat, Severity, Target, AuditResult } from "./types.js";
 
+const pkg = JSON.parse(
+  readFileSync(join(dirname(fileURLToPath(import.meta.url)), "..", "package.json"), "utf-8")
+);
+
 const program = new Command();
 
 program
   .name("mcpeek")
   .description("Source-code security scanner for MCP server implementations")
-  .version("1.0.0");
+  .version(pkg.version);
 
 // ── scan command ────────────────────────────────────────────────────────────
 program
