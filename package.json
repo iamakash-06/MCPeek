@@ -1,7 +1,7 @@
 {
   "name": "mcpeek",
-  "version": "1.0.0",
-  "description": "Source-code-level security scanner for MCP server implementations",
+  "version": "1.1.0",
+  "description": "Source-code-level security scanner for MCP (Model Context Protocol) server implementations",
   "type": "module",
   "bin": {
     "mcpeek": "./dist/cli.js"
@@ -10,23 +10,46 @@
   "exports": {
     ".": "./dist/scanner.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
+    "clean": "rm -rf dist",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint src --ext .ts"
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "npm run clean && npm run build && npm test"
   },
   "keywords": [
     "mcp",
+    "model-context-protocol",
     "security",
     "scanner",
     "sast",
-    "model-context-protocol",
     "audit",
-    "vulnerability"
+    "vulnerability",
+    "static-analysis",
+    "sarif",
+    "ts-morph"
   ],
+  "author": "Akash Sathish <sathishakash2003@gmail.com>",
   "license": "MIT",
+  "homepage": "https://github.com/iamakash-06/MCPeek#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iamakash-06/MCPeek.git"
+  },
+  "bugs": {
+    "url": "https://github.com/iamakash-06/MCPeek/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
   "engines": {
     "node": ">=18"
   },
