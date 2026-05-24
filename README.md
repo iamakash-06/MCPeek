@@ -76,18 +76,24 @@ Add MCPeek to any GitHub repo with the [MCPeek Action](https://github.com/iamaka
     fail-on: high
 ```
 
-To upload findings to GitHub Code Scanning:
+To upload findings to GitHub Code Scanning (the job needs `security-events: write` so `upload-sarif` can post results):
 
 ```yaml
-- uses: iamakash-06/mcpeek-action@v1
-  id: mcpeek
-  with:
-    format: sarif
-    output: mcpeek.sarif
-- uses: github/codeql-action/upload-sarif@v3
-  if: always()
-  with:
-    sarif_file: ${{ steps.mcpeek.outputs.report }}
+permissions:
+  contents: read
+  actions: read
+  security-events: write
+
+steps:
+  - uses: iamakash-06/mcpeek-action@v1
+    id: mcpeek
+    with:
+      format: sarif
+      output: mcpeek.sarif
+  - uses: github/codeql-action/upload-sarif@v3
+    if: always()
+    with:
+      sarif_file: ${{ steps.mcpeek.outputs.report }}
 ```
 
 ## License
