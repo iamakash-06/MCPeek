@@ -1,0 +1,9 @@
+name: MCPeek CodeQL config
+
+paths-ignore:
+  # Test fixtures contain intentionally vulnerable code used to exercise the
+  # scanner's rules. Scanning them produces noise about issues that are the
+  # whole point of the file existing.
+  - tests/fixtures/**
+  - dist/**
+  - node_modules/**
