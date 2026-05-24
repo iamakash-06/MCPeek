@@ -67,16 +67,17 @@ npx mcpeek scan <target>
 
 ## Use in CI
 
-Add MCPeek to any GitHub repo with the [MCPeek Action](https://github.com/iamakash-06/mcpeek-action):
+Run MCPeek directly with `npx` in any GitHub Actions workflow:
 
 ```yaml
-- uses: iamakash-06/mcpeek-action@v1
+- uses: actions/checkout@v4
+- uses: actions/setup-node@v4
   with:
-    target: .
-    fail-on: high
+    node-version: "20"
+- run: npx mcpeek scan . --ci --fail-on high
 ```
 
-To upload findings to GitHub Code Scanning (the job needs `security-events: write` so `upload-sarif` can post results):
+To upload findings to GitHub Code Scanning, emit SARIF and hand it to `upload-sarif` (the job needs `security-events: write`):
 
 ```yaml
 permissions:
@@ -85,15 +86,15 @@ permissions:
   security-events: write
 
 steps:
-  - uses: iamakash-06/mcpeek-action@v1
-    id: mcpeek
+  - uses: actions/checkout@v4
+  - uses: actions/setup-node@v4
     with:
-      format: sarif
-      output: mcpeek.sarif
+      node-version: "20"
+  - run: npx mcpeek scan . --format sarif --output mcpeek.sarif
   - uses: github/codeql-action/upload-sarif@v3
     if: always()
     with:
-      sarif_file: ${{ steps.mcpeek.outputs.report }}
+      sarif_file: mcpeek.sarif
 ```
 
 ## License
