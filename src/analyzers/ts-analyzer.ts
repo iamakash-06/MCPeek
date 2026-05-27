@@ -66,7 +66,9 @@ export async function analyzeTypeScript(
       !fp.includes("/dist/") &&
       !fp.includes("/build/") &&
       !fp.endsWith(".d.ts") &&
-      !isTestFile(fp)
+      // L15: example/test files are skipped by default, but a shipped vulnerable
+      // example server can be a real risk — --include-tests opts them back in.
+      (options.includeTests || !isTestFile(fp))
     );
   });
 

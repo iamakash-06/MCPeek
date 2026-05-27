@@ -29,6 +29,7 @@ program
   .option("--rules <rules>", "Comma-separated list of rules to run")
   .option("--registrations <names>", "Comma-separated custom tool-registration function names (e.g. registerMyTool)")
   .option("--taint-context", "Treat the handler's second (context) parameter as attacker-controlled")
+  .option("--include-tests", "Also scan example/test/demo files normally excluded")
   .option("--ci", "CI mode: exit with code 1 if issues found")
   .option("--fail-on <severity>", "Minimum severity to trigger CI failure (critical|high|medium|low)", "high")
   .action(async (target: string, opts) => {
@@ -43,6 +44,7 @@ program
       rules,
       extraRegistrations,
       taintContextParam: opts.taintContext,
+      includeTests: opts.includeTests,
     });
 
     const format = opts.format as OutputFormat;

@@ -53,6 +53,8 @@ export interface ScanOptions {
   extraRegistrations?: string[];
   /** Treat the handler's second (context) parameter as tainted too (limitation L6). */
   taintContextParam?: boolean;
+  /** Scan example/test/demo files normally excluded by the filter (limitation L15). */
+  includeTests?: boolean;
 }
 
 export interface AuditResult {
