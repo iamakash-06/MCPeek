@@ -75,6 +75,46 @@ describe("command-injection rule", () => {
     expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("execSync()");
   });
 
+  it("does NOT see a custom registration wrapper by default (L7)", () => {
+    const sf = makeProject(`
+      function registerMyTool(name, handler) { /* ... */ }
+      registerMyTool("run", async ({ cmd }) => {
+        execSync(cmd);
+        return { content: [] };
+      });
+    `);
+    expect(detectCommandInjection(sf)).toHaveLength(0);
+  });
+
+  it("detects a custom registration wrapper when configured (L7)", () => {
+    const sf = makeProject(`
+      function registerMyTool(name, handler) { /* ... */ }
+      registerMyTool("run", async ({ cmd }) => {
+        execSync(cmd);
+        return { content: [] };
+      });
+    `);
+    const findings = detectCommandInjection(sf, {
+      extraRegistrations: ["registerMyTool"],
+    });
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].rule).toBe("mcp-command-injection");
+    expect(findings[0].taintChain![0]).toContain("handler param");
+  });
+
+  it("matches a dotted custom registration name by its last segment", () => {
+    const sf = makeProject(`
+      tools.registerMyTool("run", async ({ cmd }) => {
+        execSync(cmd);
+        return { content: [] };
+      });
+    `);
+    const findings = detectCommandInjection(sf, {
+      extraRegistrations: ["registerMyTool"],
+    });
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("does NOT flag execSync with a hardcoded command", () => {
     const sf = makeProject(`
       server.tool("list", {}, async () => {

@@ -22,22 +22,43 @@ export interface MCPToolHandler {
   handlerBody: Node | undefined;
 }
 
-export function findMCPToolHandlers(sourceFile: SourceFile): MCPToolHandler[] {
+export interface HandlerScanOptions {
+  /**
+   * Extra function names that register MCP tools via a project-local wrapper,
+   * e.g. `registerMyTool("run", handler)`. Without these, custom wrappers are
+   * invisible to taint analysis (limitation L7). Matched against the full
+   * callee text and its last dotted segment.
+   */
+  extraRegistrations?: string[];
+}
+
+function isMCPRegistration(text: string, extraRegistrations: string[]): boolean {
+  if (
+    text.endsWith(".tool") ||
+    text.endsWith(".setRequestHandler") ||
+    text.endsWith(".addTool") ||
+    text === "server.tool" ||
+    text === "server.setRequestHandler"
+  ) {
+    return true;
+  }
+  const lastSegment = text.split(".").pop() ?? text;
+  return extraRegistrations.some((name) => text === name || lastSegment === name);
+}
+
+export function findMCPToolHandlers(
+  sourceFile: SourceFile,
+  options: HandlerScanOptions = {}
+): MCPToolHandler[] {
   const results: MCPToolHandler[] = [];
+  const extraRegistrations = options.extraRegistrations ?? [];
   const calls = sourceFile.getDescendantsOfKind(SyntaxKind.CallExpression);
 
   for (const call of calls) {
     const expr = call.getExpression();
     const text = expr.getText();
 
-    const isMCPRegistration =
-      text.endsWith(".tool") ||
-      text.endsWith(".setRequestHandler") ||
-      text.endsWith(".addTool") ||
-      text === "server.tool" ||
-      text === "server.setRequestHandler";
-
-    if (!isMCPRegistration) continue;
+    if (!isMCPRegistration(text, extraRegistrations)) continue;
 
     const args = call.getArguments();
     if (args.length < 2) continue;
