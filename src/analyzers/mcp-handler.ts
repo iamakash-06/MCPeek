@@ -30,6 +30,13 @@ export interface HandlerScanOptions {
    * callee text and its last dotted segment.
    */
   extraRegistrations?: string[];
+  /**
+   * Treat the handler's second parameter (the SDK context object) as
+   * attacker-controlled too (limitation L6). Off by default — only useful when a
+   * custom wrapper injects user data into context, and it raises false positives
+   * on normal SDK context usage.
+   */
+  taintContextParam?: boolean;
 }
 
 function isMCPRegistration(text: string, extraRegistrations: string[]): boolean {
@@ -74,11 +81,13 @@ export function findMCPToolHandlers(
     if (!handlerFn) continue;
 
     // MCP handlers receive a single destructured input object as their first param.
-    // Slice to 1 to avoid treating the SDK context object as user-controlled input.
+    // Slice to 1 to avoid treating the SDK context object as user-controlled input,
+    // unless taintContextParam opts in to modeling the second param too (L6).
     const params = handlerFn.getParameters();
     const paramNames: string[] = [];
+    const paramLimit = options.taintContextParam ? 2 : 1;
 
-    for (const param of params.slice(0, 1)) {
+    for (const param of params.slice(0, paramLimit)) {
       const binding = param.getNameNode();
       if (binding.getKind() === SyntaxKind.ObjectBindingPattern) {
         binding

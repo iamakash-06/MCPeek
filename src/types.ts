@@ -51,6 +51,8 @@ export interface ScanOptions {
   ci?: boolean;
   /** Extra project-local function names that register MCP tools (limitation L7). */
   extraRegistrations?: string[];
+  /** Treat the handler's second (context) parameter as tainted too (limitation L6). */
+  taintContextParam?: boolean;
 }
 
 export interface AuditResult {
