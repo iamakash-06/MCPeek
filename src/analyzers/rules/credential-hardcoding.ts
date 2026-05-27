@@ -2,11 +2,11 @@ import { SourceFile, SyntaxKind, Node } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { extractSnippet } from "../snippet.js";
 
-const CREDENTIAL_NAME_PATTERN =
+export const CREDENTIAL_NAME_PATTERN =
   /\b(api[_-]?key|apikey|secret|token|password|passwd|auth[_-]?key|access[_-]?key|private[_-]?key|client[_-]?secret|bearer)\b/i;
 
 // Known credential prefixes (OpenAI, GitHub, Anthropic, Stripe, etc.)
-const CREDENTIAL_VALUE_PATTERNS = [
+export const CREDENTIAL_VALUE_PATTERNS = [
   /^sk-[a-zA-Z0-9]{20,}$/,
   /^ghp_[a-zA-Z0-9]{36}$/,
   /^ghs_[a-zA-Z0-9]{36}$/,
@@ -17,7 +17,7 @@ const CREDENTIAL_VALUE_PATTERNS = [
   /^[a-f0-9]{32}$/,
 ];
 
-const MIN_SUSPICIOUS_LENGTH = 16;
+export const MIN_SUSPICIOUS_LENGTH = 16;
 
 // Values that look like credentials but are obviously placeholders
 const PLACEHOLDER_PATTERNS = [
@@ -134,7 +134,7 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
   return findings;
 }
 
-function isPlaceholder(value: string): boolean {
+export function isPlaceholder(value: string): boolean {
   return PLACEHOLDER_PATTERNS.some((p) => p.test(value));
 }
 

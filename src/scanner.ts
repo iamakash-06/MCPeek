@@ -1,5 +1,6 @@
 import type { ScanResult, ScanOptions, Finding, Severity } from "./types.js";
 import { analyzeTypeScript } from "./analyzers/ts-analyzer.js";
+import { scanEnvFiles } from "./analyzers/env-scanner.js";
 import { fetchRepo } from "./repo-fetcher.js";
 
 const SEVERITY_WEIGHT: Record<Severity, number> = {
@@ -17,7 +18,11 @@ export async function scan(
   const { path, cleanup } = await fetchRepo(target);
 
   try {
-    const { findings, filesScanned } = await analyzeTypeScript(path, options);
+    const { findings: codeFindings, filesScanned } = await analyzeTypeScript(path, options);
+
+    // Dotenv scanning is independent of the TS Program — a committed .env can
+    // leak secrets even in a repo with zero TypeScript files (filesScanned: 0).
+    const findings = [...codeFindings, ...scanEnvFiles(path)];
 
     const summary = buildSummary(findings);
     const score = calculateScore(findings);
