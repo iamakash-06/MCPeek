@@ -2,3 +2,8 @@ node_modules/
 dist/
 results/
 *.tsbuildinfo
+
+# Local Claude Code context — not part of the published project
+.claude/
+CLAUDE.md
+.DS_Store
