@@ -1,7 +1,7 @@
 import { SourceFile, SyntaxKind, Node, Identifier } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { getTaintedNames } from "../taint-tracker.js";
-import { findMCPToolHandlers } from "../mcp-handler.js";
+import { findMCPToolHandlers, type HandlerScanOptions } from "../mcp-handler.js";
 import { extractSnippet } from "../snippet.js";
 
 const FS_SINKS = new Set([
@@ -31,11 +31,14 @@ const FS_SINKS = new Set([
   "renameSync",
 ]);
 
-export function detectPathTraversal(sourceFile: SourceFile): Finding[] {
+export function detectPathTraversal(
+  sourceFile: SourceFile,
+  options: HandlerScanOptions = {}
+): Finding[] {
   const findings: Finding[] = [];
   const filePath = sourceFile.getFilePath();
 
-  for (const { paramNames, handlerBody } of findMCPToolHandlers(sourceFile)) {
+  for (const { paramNames, handlerBody } of findMCPToolHandlers(sourceFile, options)) {
     if (!handlerBody || paramNames.length === 0) continue;
 
     const tainted = getTaintedNames(handlerBody, paramNames);

@@ -49,6 +49,8 @@ export interface ScanOptions {
   verify?: boolean;
   failOn?: Severity;
   ci?: boolean;
+  /** Extra project-local function names that register MCP tools (limitation L7). */
+  extraRegistrations?: string[];
 }
 
 export interface AuditResult {

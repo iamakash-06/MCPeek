@@ -2,6 +2,7 @@ import { Project } from "ts-morph";
 import { existsSync } from "fs";
 import { join } from "path";
 import type { Finding, ScanOptions } from "../types.js";
+import type { HandlerScanOptions } from "./mcp-handler.js";
 import { detectCommandInjection } from "./rules/command-injection.js";
 import { detectMissingInputValidation } from "./rules/input-validation.js";
 import { detectHardcodedCredentials } from "./rules/credential-hardcoding.js";
@@ -73,12 +74,16 @@ export async function analyzeTypeScript(
     ? (options.rules.filter((r) => ALL_RULES.includes(r as RuleName)) as RuleName[])
     : ALL_RULES;
 
+  const handlerOptions: HandlerScanOptions = {
+    extraRegistrations: options.extraRegistrations,
+  };
+
   const allFindings: Finding[] = [];
 
   for (const sourceFile of sourceFiles) {
     for (const rule of activeRules) {
       try {
-        allFindings.push(...runRule(rule, sourceFile));
+        allFindings.push(...runRule(rule, sourceFile, handlerOptions));
       } catch {
         // Skip files that fail to parse
       }
@@ -93,27 +98,28 @@ export async function analyzeTypeScript(
 
 function runRule(
   rule: RuleName,
-  sourceFile: ReturnType<Project["getSourceFiles"]>[0]
+  sourceFile: ReturnType<Project["getSourceFiles"]>[0],
+  handlerOptions: HandlerScanOptions
 ): Finding[] {
   switch (rule) {
     case "command-injection":
-      return detectCommandInjection(sourceFile);
+      return detectCommandInjection(sourceFile, handlerOptions);
     case "input-validation":
       return detectMissingInputValidation(sourceFile);
     case "credential-hardcoding":
       return detectHardcodedCredentials(sourceFile);
     case "path-traversal":
-      return detectPathTraversal(sourceFile);
+      return detectPathTraversal(sourceFile, handlerOptions);
     case "ssrf":
-      return detectSSRF(sourceFile);
+      return detectSSRF(sourceFile, handlerOptions);
     case "weak-schema-bounds":
       return detectWeakSchemaBounds(sourceFile);
     case "tool-poisoning":
       return detectToolPoisoning(sourceFile);
     case "sql-injection":
-      return detectSqlInjection(sourceFile);
+      return detectSqlInjection(sourceFile, handlerOptions);
     case "code-injection":
-      return detectCodeInjection(sourceFile);
+      return detectCodeInjection(sourceFile, handlerOptions);
   }
 }
 
