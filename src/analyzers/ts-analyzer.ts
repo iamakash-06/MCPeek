@@ -76,6 +76,7 @@ export async function analyzeTypeScript(
 
   const handlerOptions: HandlerScanOptions = {
     extraRegistrations: options.extraRegistrations,
+    taintContextParam: options.taintContextParam,
   };
 
   const allFindings: Finding[] = [];

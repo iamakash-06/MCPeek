@@ -115,6 +115,28 @@ describe("command-injection rule", () => {
     expect(findings.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("does NOT taint the context parameter by default (L6)", () => {
+    const sf = makeProject(`
+      server.tool("ctx", { x: z.string() }, async (input, context) => {
+        execSync(context.userCmd);
+        return { content: [] };
+      });
+    `);
+    expect(detectCommandInjection(sf)).toHaveLength(0);
+  });
+
+  it("taints the context parameter when taintContextParam is set (L6)", () => {
+    const sf = makeProject(`
+      server.tool("ctx", { x: z.string() }, async (input, context) => {
+        execSync(context.userCmd);
+        return { content: [] };
+      });
+    `);
+    const findings = detectCommandInjection(sf, { taintContextParam: true });
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].rule).toBe("mcp-command-injection");
+  });
+
   it("does NOT flag execSync with a hardcoded command", () => {
     const sf = makeProject(`
       server.tool("list", {}, async () => {
