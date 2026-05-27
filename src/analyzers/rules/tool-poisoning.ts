@@ -49,6 +49,10 @@ const MAX_DESCRIPTION_LEN = 2000;
 interface Issue {
   where: string;
   detail: string;
+  // Soft issues are low-confidence "review manually" signals (e.g. a description
+  // that is computed at runtime and therefore can't be statically inspected),
+  // not confirmed prompt-injection content.
+  soft?: boolean;
 }
 
 export function detectToolPoisoning(sourceFile: SourceFile): Finding[] {
@@ -81,29 +85,43 @@ export function detectToolPoisoning(sourceFile: SourceFile): Finding[] {
     }
 
     // -------- Description-like strings in remaining args --------
-    for (const { value } of collectDescriptionStrings(call, nameArg)) {
-      for (const detail of checkDescriptionString(value)) {
-        issues.push({ where: "description", detail });
+    for (const desc of collectDescriptionStrings(call, nameArg)) {
+      if (desc.value !== undefined) {
+        for (const detail of checkDescriptionString(desc.value)) {
+          issues.push({ where: "description", detail });
+        }
+      } else if (desc.dynamic) {
+        // L8: a runtime-computed description can smuggle instructions we can't see.
+        issues.push({
+          where: "description",
+          detail: "is computed at runtime — not statically inspectable; review manually",
+          soft: true,
+        });
       }
     }
 
     if (issues.length === 0) continue;
+
+    // A registration whose only issue is a runtime description is low-confidence;
+    // any confirmed signal (bad name, injection phrase, hidden unicode) is high.
+    const hasHardIssue = issues.some((i) => !i.soft);
 
     const lineNum = call.getStartLineNumber();
     const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
 
     findings.push({
       rule: "mcp-tool-poisoning",
-      severity: "high",
+      severity: hasHardIssue ? "high" : "medium",
       cwe: "CWE-74",
       file: filePath,
       line: lineNum,
       column,
       message: `Suspicious content in MCP tool metadata: ${issues.map((i) => `${i.where} — ${i.detail}`).join("; ")}`,
       evidence: extractSnippet(sourceFile, lineNum, 3),
-      remediation:
-        "Strip prompt-injection phrases, hidden unicode (RTLO/zero-width), and ANSI escape sequences from tool names and descriptions. Constrain tool names to [a-zA-Z0-9_-]+. Cap descriptions at 2000 chars.",
-      confidence: "medium",
+      remediation: hasHardIssue
+        ? "Strip prompt-injection phrases, hidden unicode (RTLO/zero-width), and ANSI escape sequences from tool names and descriptions. Constrain tool names to [a-zA-Z0-9_-]+. Cap descriptions at 2000 chars."
+        : "Prefer static string literals for tool descriptions so they can be audited. If the description must be computed, validate it against an allowlist before registration.",
+      confidence: hasHardIssue ? "medium" : "low",
     });
   }
 
@@ -146,8 +164,8 @@ function checkDescriptionString(value: string): string[] {
 function collectDescriptionStrings(
   call: CallExpression,
   nameArg: Node
-): Array<{ value: string }> {
-  const results: Array<{ value: string }> = [];
+): Array<{ value?: string; dynamic?: boolean }> {
+  const results: Array<{ value?: string; dynamic?: boolean }> = [];
 
   for (const arg of call.getArguments()) {
     if (arg === nameArg) continue;
@@ -172,7 +190,13 @@ function collectDescriptionStrings(
       const init = pa.getInitializer();
       if (!init) continue;
       const value = stringLiteralValue(init);
-      if (value !== undefined) results.push({ value });
+      if (value !== undefined) {
+        results.push({ value });
+      } else {
+        // description present but not a static string literal (identifier, call,
+        // concatenation, template with substitutions) → runtime-computed.
+        results.push({ dynamic: true });
+      }
     }
   }
 
