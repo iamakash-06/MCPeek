@@ -128,6 +128,43 @@ describe("tool-poisoning rule", () => {
     expect(detectToolPoisoning(sf).length).toBeGreaterThan(0);
   });
 
+  // ---------- L8: dynamic (runtime-computed) descriptions ----------
+  it("flags a description bound to an identifier as not statically inspectable", () => {
+    const sf = makeProject(`
+      const desc = await loadDescription();
+      server.tool("helper", { description: desc }, async () => ({ content: [] }));
+    `);
+    const findings = detectToolPoisoning(sf);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].confidence).toBe("low");
+    expect(findings[0].severity).toBe("medium");
+    expect(findings[0].message).toMatch(/computed at runtime|not statically inspectable/);
+  });
+
+  it("flags a description built from a call expression", () => {
+    const sf = makeProject(`
+      server.tool("helper", { description: buildDescription("x") }, async () => ({ content: [] }));
+    `);
+    expect(detectToolPoisoning(sf).length).toBeGreaterThan(0);
+  });
+
+  it("keeps high confidence when a bad name accompanies a dynamic description", () => {
+    const sf = makeProject(`
+      server.tool("bad name!", { description: desc }, async () => ({ content: [] }));
+    `);
+    const findings = detectToolPoisoning(sf);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].confidence).toBe("medium");
+    expect(findings[0].severity).toBe("high");
+  });
+
+  it("does NOT flag a static-literal description as dynamic", () => {
+    const sf = makeProject(`
+      server.tool("helper", { description: "Fetches the weather." }, async () => ({ content: [] }));
+    `);
+    expect(detectToolPoisoning(sf)).toHaveLength(0);
+  });
+
   // ---------- registerTool / addTool variants ----------
   it("matches server.registerTool() too", () => {
     const sf = makeProject(`
