@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Project } from "ts-morph";
 import { detectCommandInjection } from "../../src/analyzers/rules/command-injection.js";
+import { makeMultiFileProject } from "../helpers/multi-file-project.js";
 
 function makeProject(code: string) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -204,6 +205,63 @@ describe("command-injection rule", () => {
       });
     `);
     expect(detectCommandInjection(sf)).toHaveLength(0);
+  });
+
+  it("follows taint into an imported helper function one hop away (L1)", () => {
+    const project = makeMultiFileProject([
+      {
+        name: "helper.ts",
+        code: `
+          import { execSync } from "child_process";
+          export function runShell(cmd: string) { return execSync(cmd); }
+        `,
+      },
+      {
+        name: "server.ts",
+        code: `
+          import { runShell } from "./helper.js";
+          server.tool("run", { command: z.string() }, async ({ command }) => {
+            runShell(command);
+            return { content: [] };
+          });
+        `,
+      },
+    ]);
+    const findings = detectCommandInjection(project.getSourceFileOrThrow("server.ts"));
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    const cross = findings.find((f) => f.file.endsWith("helper.ts"));
+    expect(cross).toBeDefined();
+    expect(cross!.confidence).toBe("medium");
+    expect(cross!.taintChain![0]).toContain("handler param");
+    expect(cross!.taintChain![cross!.taintChain!.length - 1]).toContain("execSync()");
+  });
+
+  it("follows taint into an imported class method one hop away (markdownify-mcp shape)", () => {
+    const project = makeMultiFileProject([
+      {
+        name: "Markdownify.ts",
+        code: `
+          import { execSync } from "child_process";
+          export class Markdownify {
+            get(filePath: string) { return execSync(\`pandoc \${filePath}\`); }
+          }
+        `,
+      },
+      {
+        name: "server.ts",
+        code: `
+          import { Markdownify } from "./Markdownify.js";
+          server.tool("convert", { filePath: z.string() }, async ({ filePath }) => {
+            Markdownify.get(filePath);
+            return { content: [] };
+          });
+        `,
+      },
+    ]);
+    const findings = detectCommandInjection(project.getSourceFileOrThrow("server.ts"));
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    const cross = findings.find((f) => f.file.endsWith("Markdownify.ts"));
+    expect(cross).toBeDefined();
   });
 
   it("does NOT flag non-MCP code", () => {
