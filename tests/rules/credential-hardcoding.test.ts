@@ -36,6 +36,24 @@ describe("credential-hardcoding rule", () => {
     expect(findings).toHaveLength(0);
   });
 
+  it("detects known-prefix credential bound to a non-credential variable name (L11)", () => {
+    const sf = makeProject(`
+      const ANTHROPIC = "sk-ant-api03-AbCdEf0123456789GhIjKl0123456789MnOpQr0123456789StUvWx0123456789YzAbCdEfGhIjKl";
+      const X = "ghp_abcdEFGHijklMNOPqrstUVWXyz0123456789";
+    `);
+    const findings = detectHardcodedCredentials(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(2);
+    expect(findings.every((f) => f.rule === "mcp-hardcoded-credential")).toBe(true);
+  });
+
+  it("does NOT double-report a credential already caught by the name pass", () => {
+    const sf = makeProject(`
+      const apiKey = "sk-1234567890abcdefghijklmnopqrstuv";
+    `);
+    const findings = detectHardcodedCredentials(sf);
+    expect(findings).toHaveLength(1);
+  });
+
   it("does NOT flag short placeholder strings", () => {
     const sf = makeProject(`
       const apiKey = "YOUR_KEY_HERE";

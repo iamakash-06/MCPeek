@@ -36,6 +36,16 @@ const SQL_SINKS = new Set([
 const DB_RECEIVER_PATTERN =
   /\b(db|pool|client|knex|sequelize|prisma|pg|conn|connection|sqlite|sqlite3|mysql|postgres|dataSource|datasource|repo|repository|trx|transaction)\b/i;
 
+const DB_TYPE_NAMES = new Set([
+  "Pool", "PoolClient", "Client", "Database", "PrismaClient",
+  "Sequelize", "Knex", "Connection", "DataSource",
+]);
+
+const DB_CONSTRUCTOR_NAMES = new Set([
+  "Pool", "Client", "PrismaClient", "Sequelize", "Knex", "Database",
+  "createConnection", "createPool", "createClient", "open",
+]);
+
 export function detectSqlInjection(
   sourceFile: SourceFile,
   options: HandlerScanOptions = {}
@@ -90,7 +100,9 @@ function checkCall(
   // Template literals into a SQL sink are unsafe regardless of receiver.
   // Other shapes (concatenation, variable, string literal that somehow
   // matches a tainted name) require a DB-like receiver to flag.
-  if (!isTemplate && !DB_RECEIVER_PATTERN.test(callText)) return undefined;
+  if (!isTemplate && !isDbReceiver(callExpr.getExpression(), callText)) {
+    return undefined;
+  }
 
   return buildFinding(callExpr, funcName, matched, sourceFile, filePath);
 }
@@ -118,6 +130,43 @@ function checkTaggedTemplate(
   if (!matched) return undefined;
 
   return buildFinding(node, funcName, matched, sourceFile, filePath);
+}
+
+function isDbReceiver(callee: Node, callText: string): boolean {
+  if (DB_RECEIVER_PATTERN.test(callText)) return true;
+
+  const propAccess = callee.asKind(SyntaxKind.PropertyAccessExpression);
+  const receiver = propAccess?.getExpression();
+  const receiverIdent = receiver?.asKind(SyntaxKind.Identifier);
+  if (!receiverIdent) return false;
+
+  let defs;
+  try {
+    defs = receiverIdent.getDefinitionNodes();
+  } catch {
+    return false;
+  }
+
+  for (const def of defs) {
+    const varDecl = def.asKind(SyntaxKind.VariableDeclaration);
+    if (!varDecl) continue;
+
+    const typeText = varDecl.getTypeNode()?.getText();
+    if (typeText && DB_TYPE_NAMES.has(typeText.split(/[<\s]/)[0])) return true;
+
+    const init = varDecl.getInitializer();
+    const newExpr = init?.asKind(SyntaxKind.NewExpression);
+    if (newExpr) {
+      const ctor = newExpr.getExpression().getText().split(".").pop();
+      if (ctor && DB_CONSTRUCTOR_NAMES.has(ctor)) return true;
+    }
+    const callInit = init?.asKind(SyntaxKind.CallExpression);
+    if (callInit) {
+      const fname = callInit.getExpression().getText().split(".").pop();
+      if (fname && DB_CONSTRUCTOR_NAMES.has(fname)) return true;
+    }
+  }
+  return false;
 }
 
 function buildFinding(
