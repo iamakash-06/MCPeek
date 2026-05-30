@@ -264,6 +264,57 @@ describe("command-injection rule", () => {
     expect(cross).toBeDefined();
   });
 
+  it("matches a handler passed by reference to a local const (L7)", () => {
+    const sf = makeProject(`
+      import { execSync } from "child_process";
+      const runHandler = async ({ command }) => {
+        execSync(command);
+        return { content: [] };
+      };
+      server.tool("run", { command: z.string() }, runHandler);
+    `);
+    const findings = detectCommandInjection(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("matches a handler imported from another file (L7)", () => {
+    const project = makeMultiFileProject([
+      {
+        name: "handlers.ts",
+        code: `
+          import { execSync } from "child_process";
+          export const runHandler = async ({ command }) => {
+            execSync(command);
+            return { content: [] };
+          };
+        `,
+      },
+      {
+        name: "server.ts",
+        code: `
+          import { runHandler } from "./handlers.js";
+          server.tool("run", { command: z.string() }, runHandler);
+        `,
+      },
+    ]);
+    const findings = detectCommandInjection(project.getSourceFileOrThrow("server.ts"));
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].rule).toBe("mcp-command-injection");
+  });
+
+  it("matches a handler passed as a function declaration reference", () => {
+    const sf = makeProject(`
+      import { execSync } from "child_process";
+      async function runHandler({ command }) {
+        execSync(command);
+        return { content: [] };
+      }
+      server.tool("run", { command: z.string() }, runHandler);
+    `);
+    const findings = detectCommandInjection(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("does NOT flag non-MCP code", () => {
     const sf = makeProject(`
       function runCommand(cmd: string) {
