@@ -9,7 +9,6 @@ function makeProject(code: string) {
 }
 
 describe("tool-poisoning rule", () => {
-  // ---------- Tool name ----------
   it("flags tool names with characters outside [a-zA-Z0-9_-]", () => {
     const sf = makeProject(`
       server.tool("bad tool name!", { q: z.string() }, async () => ({ content: [] }));
@@ -38,7 +37,6 @@ describe("tool-poisoning rule", () => {
     expect(findings[0].message).toMatch(/hidden unicode|name/);
   });
 
-  // ---------- Description: prompt injection ----------
   it("flags 'ignore previous instructions' in description", () => {
     const sf = makeProject(`
       server.tool("safe_name", {
@@ -70,7 +68,6 @@ describe("tool-poisoning rule", () => {
     expect(detectToolPoisoning(sf).length).toBeGreaterThan(0);
   });
 
-  // ---------- Description: hidden unicode and ANSI ----------
   it("flags zero-width chars in description", () => {
     const sf = makeProject(`
       server.tool("safe_name", {
@@ -93,7 +90,6 @@ describe("tool-poisoning rule", () => {
     expect(findings[0].message).toMatch(/ANSI/);
   });
 
-  // ---------- Description: length ----------
   it("flags descriptions longer than 2000 chars", () => {
     const long = "x".repeat(2500);
     const sf = makeProject(`
@@ -115,8 +111,7 @@ describe("tool-poisoning rule", () => {
     expect(detectToolPoisoning(sf)).toHaveLength(0);
   });
 
-  // ---------- 4-arg form: server.tool(name, description, schema, handler) ----------
-  it("flags description in 4-arg server.tool form", () => {
+  it("flags description in the 4-arg server.tool(name, description, schema, handler) form", () => {
     const sf = makeProject(`
       server.tool(
         "safe_name",
@@ -128,7 +123,6 @@ describe("tool-poisoning rule", () => {
     expect(detectToolPoisoning(sf).length).toBeGreaterThan(0);
   });
 
-  // ---------- L8: dynamic (runtime-computed) descriptions ----------
   it("flags a description bound to an identifier as not statically inspectable", () => {
     const sf = makeProject(`
       const desc = await loadDescription();
@@ -165,7 +159,18 @@ describe("tool-poisoning rule", () => {
     expect(detectToolPoisoning(sf)).toHaveLength(0);
   });
 
-  // ---------- registerTool / addTool variants ----------
+  it("flags shorthand { description } as not statically inspectable", () => {
+    const sf = makeProject(`
+      const description = await loadDescription();
+      server.tool("helper", { description }, async () => ({ content: [] }));
+    `);
+    const findings = detectToolPoisoning(sf);
+    expect(findings).toHaveLength(1);
+    expect(findings[0].confidence).toBe("low");
+    expect(findings[0].severity).toBe("medium");
+    expect(findings[0].message).toMatch(/computed at runtime|not statically inspectable/);
+  });
+
   it("matches server.registerTool() too", () => {
     const sf = makeProject(`
       server.registerTool("safe_name", {
