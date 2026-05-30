@@ -1,6 +1,7 @@
-import { SourceFile, SyntaxKind, Node, Identifier } from "ts-morph";
+import { SourceFile, SyntaxKind } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { getTaintedNames } from "../taint-tracker.js";
+import { findTaintedReaching } from "../taint-match.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "../mcp-handler.js";
 import { extractSnippet } from "../snippet.js";
 
@@ -55,13 +56,10 @@ export function detectPathTraversal(
 
       const pathArg = args[0];
       const argText = pathArg.getText();
-      const matchedName = [...tainted.keys()].find((p) =>
-        containsIdentifier(pathArg, p)
-      );
+      const matched = findTaintedReaching(pathArg, tainted);
 
-      if (matchedName === undefined) continue;
+      if (!matched) continue;
 
-      // Check if the path argument is wrapped in path.resolve or similar
       const hasSafeWrapper =
         argText.startsWith("path.resolve") ||
         argText.startsWith("path.normalize") ||
@@ -70,13 +68,11 @@ export function detectPathTraversal(
 
       if (!hasSafeWrapper) {
         const lineNum = call.getStartLineNumber();
-        const chain = tainted.get(matchedName)!.chain;
         const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
-        const severity = "high";
 
         findings.push({
           rule: "mcp-path-traversal",
-          severity,
+          severity: "high",
           cwe: "CWE-22",
           file: filePath,
           line: lineNum,
@@ -86,21 +82,11 @@ export function detectPathTraversal(
           remediation:
             "Use path.resolve(BASE_DIR, userInput) and verify the result starts with BASE_DIR before accessing the filesystem.",
           confidence: "high",
-          taintChain: [...chain, `${funcName}() (line ${lineNum})`],
+          taintChain: [...matched.chain, `${funcName}() (line ${lineNum})`],
         });
       }
     }
   }
 
   return findings;
-}
-
-function containsIdentifier(node: Node, name: string): boolean {
-  if (node.getKind() === SyntaxKind.Identifier && node.getText() === name) {
-    return true;
-  }
-
-  return node
-    .getDescendantsOfKind(SyntaxKind.Identifier)
-    .some((id: Identifier) => id.getText() === name);
 }

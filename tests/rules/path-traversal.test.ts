@@ -36,6 +36,22 @@ describe("path-traversal rule", () => {
     expect(findings.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("detects taint flowing through an object field assignment (L5)", () => {
+    const sf = makeProject(`
+      server.tool("read", { path: z.string() }, async ({ path }) => {
+        const opts: any = {};
+        opts.target = path;
+        const content = readFileSync(opts.target, "utf-8");
+        return { content: [] };
+      });
+    `);
+    const findings = detectPathTraversal(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].rule).toBe("mcp-path-traversal");
+    expect(findings[0].taintChain![0]).toContain("handler param");
+    expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("readFileSync()");
+  });
+
   it("does NOT flag file ops with hardcoded paths", () => {
     const sf = makeProject(`
       server.tool("read_config", {}, async () => {

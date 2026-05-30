@@ -1,6 +1,7 @@
-import { SourceFile, SyntaxKind, Node, Identifier } from "ts-morph";
+import { SourceFile, SyntaxKind } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { getTaintedNames } from "../taint-tracker.js";
+import { findTaintedReaching } from "../taint-match.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "../mcp-handler.js";
 import { extractSnippet } from "../snippet.js";
 
@@ -34,10 +35,8 @@ export function detectCodeInjection(
       const args = call.getArguments();
       if (args.length === 0) continue;
 
-      const matchedName = [...tainted.keys()].find((p) =>
-        containsIdentifier(args[0], p)
-      );
-      if (matchedName === undefined) continue;
+      const matched = findTaintedReaching(args[0], tainted);
+      if (!matched) continue;
 
       const lineNum = call.getStartLineNumber();
       const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
@@ -47,7 +46,7 @@ export function detectCodeInjection(
           lineNum,
           column,
           `${funcName}()`,
-          tainted.get(matchedName)!.chain,
+          matched.chain,
           sourceFile
         )
       );
@@ -61,10 +60,12 @@ export function detectCodeInjection(
       const args = expr.getArguments();
       if (args.length === 0) continue;
 
-      const matchedName = [...tainted.keys()].find((p) =>
-        args.some((arg) => containsIdentifier(arg, p))
-      );
-      if (matchedName === undefined) continue;
+      let matched;
+      for (const arg of args) {
+        matched = findTaintedReaching(arg, tainted);
+        if (matched) break;
+      }
+      if (!matched) continue;
 
       const lineNum = expr.getStartLineNumber();
       const { column } = sourceFile.getLineAndColumnAtPos(expr.getStart());
@@ -74,7 +75,7 @@ export function detectCodeInjection(
           lineNum,
           column,
           `new ${ctorName}()`,
-          tainted.get(matchedName)!.chain,
+          matched.chain,
           sourceFile
         )
       );
@@ -108,11 +109,3 @@ function makeFinding(
   };
 }
 
-function containsIdentifier(node: Node, name: string): boolean {
-  if (node.getKind() === SyntaxKind.Identifier && node.getText() === name) {
-    return true;
-  }
-  return node
-    .getDescendantsOfKind(SyntaxKind.Identifier)
-    .some((id: Identifier) => id.getText() === name);
-}

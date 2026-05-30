@@ -1,6 +1,7 @@
-import { SourceFile, SyntaxKind, Node, Identifier } from "ts-morph";
+import { SourceFile, SyntaxKind } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { getTaintedNames } from "../taint-tracker.js";
+import { findTaintedReaching } from "../taint-match.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "../mcp-handler.js";
 import { extractSnippet } from "../snippet.js";
 
@@ -41,11 +42,9 @@ export function detectSSRF(
       const urlArg = args[0];
       const urlText = urlArg.getText();
 
-      const matchedName = [...tainted.keys()].find((p) =>
-        containsIdentifier(urlArg, p)
-      );
+      const matched = findTaintedReaching(urlArg, tainted);
 
-      if (matchedName === undefined) continue;
+      if (!matched) continue;
 
       if (
         urlArg.getKind() === SyntaxKind.TemplateExpression ||
@@ -68,7 +67,6 @@ export function detectSSRF(
 
       if (!hasAllowlist) {
         const lineNum = call.getStartLineNumber();
-        const chain = tainted.get(matchedName)!.chain;
         const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
 
         findings.push({
@@ -83,21 +81,11 @@ export function detectSSRF(
           remediation:
             "Validate the URL against an allowlist of permitted hostnames. Use new URL(input) and check .hostname against known-safe values.",
           confidence: "high",
-          taintChain: [...chain, `${callText}() (line ${lineNum})`],
+          taintChain: [...matched.chain, `${callText}() (line ${lineNum})`],
         });
       }
     }
   }
 
   return findings;
-}
-
-function containsIdentifier(node: Node, name: string): boolean {
-  if (node.getKind() === SyntaxKind.Identifier && node.getText() === name) {
-    return true;
-  }
-
-  return node
-    .getDescendantsOfKind(SyntaxKind.Identifier)
-    .some((id: Identifier) => id.getText() === name);
 }

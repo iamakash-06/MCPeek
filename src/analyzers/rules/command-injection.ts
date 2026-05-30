@@ -1,6 +1,7 @@
-import { SourceFile, SyntaxKind, Node, Identifier } from "ts-morph";
+import { SourceFile, SyntaxKind } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { getTaintedNames } from "../taint-tracker.js";
+import { findTaintedReaching } from "../taint-match.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "../mcp-handler.js";
 import { extractSnippet } from "../snippet.js";
 
@@ -39,13 +40,10 @@ export function detectCommandInjection(
       if (args.length === 0) continue;
 
       const firstArg = args[0];
-      const matchedName = [...tainted.keys()].find((p) =>
-        containsIdentifier(firstArg, p)
-      );
+      const matched = findTaintedReaching(firstArg, tainted);
 
-      if (matchedName !== undefined) {
+      if (matched) {
         const lineNum = call.getStartLineNumber();
-        const chain = tainted.get(matchedName)!.chain;
         const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
 
         findings.push({
@@ -60,21 +58,11 @@ export function detectCommandInjection(
           remediation:
             "Use execFile() with a fixed command and validated argument list. Never pass user-controlled input directly to exec/spawn.",
           confidence: "high",
-          taintChain: [...chain, `${funcName}() (line ${lineNum})`],
+          taintChain: [...matched.chain, `${funcName}() (line ${lineNum})`],
         });
       }
     }
   }
 
   return findings;
-}
-
-function containsIdentifier(node: Node, name: string): boolean {
-  if (node.getKind() === SyntaxKind.Identifier && node.getText() === name) {
-    return true;
-  }
-
-  return node
-    .getDescendantsOfKind(SyntaxKind.Identifier)
-    .some((id: Identifier) => id.getText() === name);
 }

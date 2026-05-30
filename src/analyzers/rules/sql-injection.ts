@@ -14,9 +14,10 @@
  *        `$executeRawUnsafe`, `execute`, `executeQuery`, `runQuery`.
  */
 
-import { SourceFile, SyntaxKind, Node, Identifier } from "ts-morph";
+import { SourceFile, SyntaxKind, Node } from "ts-morph";
 import type { Finding } from "../../types.js";
-import { getTaintedNames, TaintMap } from "../taint-tracker.js";
+import { getTaintedNames, TaintMap, TaintEntry } from "../taint-tracker.js";
+import { findTaintedReaching } from "../taint-match.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "../mcp-handler.js";
 import { extractSnippet } from "../snippet.js";
 
@@ -78,8 +79,8 @@ function checkCall(
   if (args.length === 0) return undefined;
 
   const firstArg = args[0];
-  const matchedName = [...tainted.keys()].find((p) => containsIdentifier(firstArg, p));
-  if (matchedName === undefined) return undefined;
+  const matched = findTaintedReaching(firstArg, tainted);
+  if (!matched) return undefined;
 
   const kind = firstArg.getKind();
   const isTemplate =
@@ -91,7 +92,7 @@ function checkCall(
   // matches a tainted name) require a DB-like receiver to flag.
   if (!isTemplate && !DB_RECEIVER_PATTERN.test(callText)) return undefined;
 
-  return buildFinding(callExpr, funcName, matchedName, tainted, sourceFile, filePath);
+  return buildFinding(callExpr, funcName, matched, sourceFile, filePath);
 }
 
 function checkTaggedTemplate(
@@ -113,22 +114,20 @@ function checkTaggedTemplate(
   if (funcName === "$queryRaw" || funcName === "$executeRaw") return undefined;
 
   const template = node.getTemplate();
-  const matchedName = [...tainted.keys()].find((p) => containsIdentifier(template, p));
-  if (matchedName === undefined) return undefined;
+  const matched = findTaintedReaching(template, tainted);
+  if (!matched) return undefined;
 
-  return buildFinding(node, funcName, matchedName, tainted, sourceFile, filePath);
+  return buildFinding(node, funcName, matched, sourceFile, filePath);
 }
 
 function buildFinding(
   node: Node,
   funcName: string,
-  matchedName: string,
-  tainted: TaintMap,
+  matched: TaintEntry,
   sourceFile: SourceFile,
   filePath: string
 ): Finding {
   const lineNum = node.getStartLineNumber();
-  const chain = tainted.get(matchedName)!.chain;
   const { column } = sourceFile.getLineAndColumnAtPos(node.getStart());
 
   return {
@@ -143,15 +142,6 @@ function buildFinding(
     remediation:
       "Use parameterised queries: db.query('SELECT * FROM t WHERE id = ?', [userInput]). For Prisma, prefer the ORM API (findUnique, findMany) over $queryRaw, or pass interpolated values through tagged-template parameters so Prisma escapes them.",
     confidence: "high",
-    taintChain: [...chain, `${funcName}() (line ${lineNum})`],
+    taintChain: [...matched.chain, `${funcName}() (line ${lineNum})`],
   };
-}
-
-function containsIdentifier(node: Node, name: string): boolean {
-  if (node.getKind() === SyntaxKind.Identifier && node.getText() === name) {
-    return true;
-  }
-  return node
-    .getDescendantsOfKind(SyntaxKind.Identifier)
-    .some((id: Identifier) => id.getText() === name);
 }
