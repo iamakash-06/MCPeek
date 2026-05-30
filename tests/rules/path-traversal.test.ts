@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Project } from "ts-morph";
 import { detectPathTraversal } from "../../src/analyzers/rules/path-traversal.js";
+import { makeMultiFileProject } from "../helpers/multi-file-project.js";
 
 function makeProject(code: string) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -104,6 +105,32 @@ describe("path-traversal rule", () => {
       });
     `);
     expect(detectPathTraversal(sf).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("follows taint into an imported helper that calls readFileSync (L1)", () => {
+    const project = makeMultiFileProject([
+      {
+        name: "helper.ts",
+        code: `
+          import { readFileSync } from "fs";
+          export function readUserFile(p: string) { return readFileSync(p, "utf8"); }
+        `,
+      },
+      {
+        name: "server.ts",
+        code: `
+          import { readUserFile } from "./helper.js";
+          server.tool("read", { path: z.string() }, async ({ path }) => {
+            readUserFile(path);
+            return { content: [] };
+          });
+        `,
+      },
+    ]);
+    const findings = detectPathTraversal(project.getSourceFileOrThrow("server.ts"));
+    const cross = findings.find((f) => f.file.endsWith("helper.ts"));
+    expect(cross).toBeDefined();
+    expect(cross!.confidence).toBe("medium");
   });
 
   it("does NOT flag file ops with hardcoded paths", () => {

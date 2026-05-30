@@ -5,6 +5,8 @@ import {
   SourceFile,
   SyntaxKind,
 } from "ts-morph";
+import { getTaintedNames, TaintMap } from "./taint-tracker.js";
+import { findTaintedReaching } from "./taint-match.js";
 
 /**
  * Follows an Identifier through variable-declaration initializers — including
@@ -128,6 +130,56 @@ function followImport(sf: SourceFile, name: string): SourceFile | undefined {
     if (target) return target;
   }
   return undefined;
+}
+
+/**
+ * For each call inside `handlerBody` whose tainted argument can be followed
+ * one hop into a resolvable callee, invokes `visit` with the callee's body and
+ * a fresh taint map seeded by the matching parameter (chain extended to span
+ * the hop). Library receivers and oversized signatures are skipped; each
+ * `${file}:${fnName}` is visited at most once.
+ */
+export function forEachTaintedCallTarget(
+  handlerBody: Node,
+  tainted: TaintMap,
+  sourceFile: SourceFile,
+  visit: (calleeBody: Node, calleeTainted: TaintMap, calleeFile: string) => void
+): void {
+  const visited = new Set<string>();
+  for (const call of handlerBody.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const args = call.getArguments();
+    let taintedArgIdx = -1;
+    let inheritedChain: string[] | undefined;
+    for (let i = 0; i < args.length; i++) {
+      const m = findTaintedReaching(args[i], tainted);
+      if (m) {
+        taintedArgIdx = i;
+        inheritedChain = m.chain;
+        break;
+      }
+    }
+    if (taintedArgIdx < 0 || !inheritedChain) continue;
+
+    const callee = resolveCallee(call, sourceFile);
+    if (!callee) continue;
+    const key = `${callee.file}:${callee.fnName}`;
+    if (visited.has(key)) continue;
+    visited.add(key);
+
+    const seedParam = callee.paramNames[taintedArgIdx];
+    if (!seedParam) continue;
+
+    const calleeTainted = getTaintedNames(callee.body, [seedParam]);
+    const seedEntry = calleeTainted.get(seedParam);
+    if (seedEntry) {
+      seedEntry.chain = [
+        ...inheritedChain,
+        `${seedParam} (arg → ${callee.fnName})`,
+      ];
+    }
+
+    visit(callee.body, calleeTainted, callee.file);
+  }
 }
 
 function makeResolved(

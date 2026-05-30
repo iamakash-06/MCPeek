@@ -18,6 +18,7 @@ import { SourceFile, SyntaxKind, Node } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { getTaintedNames, TaintMap, TaintEntry } from "../taint-tracker.js";
 import { findTaintedReaching } from "../taint-match.js";
+import { forEachTaintedCallTarget } from "../cross-file.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "../mcp-handler.js";
 import { extractSnippet } from "../snippet.js";
 
@@ -51,32 +52,47 @@ export function detectSqlInjection(
   options: HandlerScanOptions = {}
 ): Finding[] {
   const findings: Finding[] = [];
-  const filePath = sourceFile.getFilePath();
 
   for (const { paramNames, handlerBody } of findMCPToolHandlers(sourceFile, options)) {
     if (!handlerBody || paramNames.length === 0) continue;
 
     const tainted = getTaintedNames(handlerBody, paramNames);
+    scanBody(handlerBody, tainted, "high", findings);
 
-    for (const call of handlerBody.getDescendantsOfKind(SyntaxKind.CallExpression)) {
-      const finding = checkCall(call, tainted, sourceFile, filePath);
-      if (finding) findings.push(finding);
-    }
-
-    for (const tagged of handlerBody.getDescendantsOfKind(SyntaxKind.TaggedTemplateExpression)) {
-      const finding = checkTaggedTemplate(tagged, tainted, sourceFile, filePath);
-      if (finding) findings.push(finding);
-    }
+    forEachTaintedCallTarget(handlerBody, tainted, sourceFile, (calleeBody, calleeTainted) => {
+      scanBody(calleeBody, calleeTainted, "medium", findings);
+    });
   }
 
   return findings;
+}
+
+function scanBody(
+  body: Node,
+  tainted: TaintMap,
+  confidence: "high" | "medium",
+  findings: Finding[]
+): void {
+  const sourceFile = body.getSourceFile();
+  const filePath = sourceFile.getFilePath();
+
+  for (const call of body.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const finding = checkCall(call, tainted, sourceFile, filePath, confidence);
+    if (finding) findings.push(finding);
+  }
+
+  for (const tagged of body.getDescendantsOfKind(SyntaxKind.TaggedTemplateExpression)) {
+    const finding = checkTaggedTemplate(tagged, tainted, sourceFile, filePath, confidence);
+    if (finding) findings.push(finding);
+  }
 }
 
 function checkCall(
   call: Node,
   tainted: TaintMap,
   sourceFile: SourceFile,
-  filePath: string
+  filePath: string,
+  confidence: "high" | "medium"
 ): Finding | undefined {
   const callExpr = call.asKind(SyntaxKind.CallExpression);
   if (!callExpr) return undefined;
@@ -97,21 +113,19 @@ function checkCall(
     kind === SyntaxKind.TemplateExpression ||
     kind === SyntaxKind.NoSubstitutionTemplateLiteral;
 
-  // Template literals into a SQL sink are unsafe regardless of receiver.
-  // Other shapes (concatenation, variable, string literal that somehow
-  // matches a tainted name) require a DB-like receiver to flag.
   if (!isTemplate && !isDbReceiver(callExpr.getExpression(), callText)) {
     return undefined;
   }
 
-  return buildFinding(callExpr, funcName, matched, sourceFile, filePath);
+  return buildFinding(callExpr, funcName, matched, sourceFile, filePath, confidence);
 }
 
 function checkTaggedTemplate(
   tagged: Node,
   tainted: TaintMap,
   sourceFile: SourceFile,
-  filePath: string
+  filePath: string,
+  confidence: "high" | "medium"
 ): Finding | undefined {
   const node = tagged.asKind(SyntaxKind.TaggedTemplateExpression);
   if (!node) return undefined;
@@ -129,7 +143,7 @@ function checkTaggedTemplate(
   const matched = findTaintedReaching(template, tainted);
   if (!matched) return undefined;
 
-  return buildFinding(node, funcName, matched, sourceFile, filePath);
+  return buildFinding(node, funcName, matched, sourceFile, filePath, confidence);
 }
 
 function isDbReceiver(callee: Node, callText: string): boolean {
@@ -174,7 +188,8 @@ function buildFinding(
   funcName: string,
   matched: TaintEntry,
   sourceFile: SourceFile,
-  filePath: string
+  filePath: string,
+  confidence: "high" | "medium"
 ): Finding {
   const lineNum = node.getStartLineNumber();
   const { column } = sourceFile.getLineAndColumnAtPos(node.getStart());
@@ -190,7 +205,7 @@ function buildFinding(
     evidence: extractSnippet(sourceFile, lineNum, 3),
     remediation:
       "Use parameterised queries: db.query('SELECT * FROM t WHERE id = ?', [userInput]). For Prisma, prefer the ORM API (findUnique, findMany) over $queryRaw, or pass interpolated values through tagged-template parameters so Prisma escapes them.",
-    confidence: "high",
+    confidence,
     taintChain: [...matched.chain, `${funcName}() (line ${lineNum})`],
   };
 }

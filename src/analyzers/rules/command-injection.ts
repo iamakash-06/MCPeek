@@ -1,7 +1,8 @@
-import { SourceFile, SyntaxKind } from "ts-morph";
+import { Node, SourceFile, SyntaxKind } from "ts-morph";
 import type { Finding } from "../../types.js";
-import { getTaintedNames } from "../taint-tracker.js";
+import { getTaintedNames, TaintMap } from "../taint-tracker.js";
 import { findTaintedReaching } from "../taint-match.js";
+import { forEachTaintedCallTarget } from "../cross-file.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "../mcp-handler.js";
 import { extractSnippet } from "../snippet.js";
 
@@ -22,47 +23,57 @@ export function detectCommandInjection(
   options: HandlerScanOptions = {}
 ): Finding[] {
   const findings: Finding[] = [];
-  const filePath = sourceFile.getFilePath();
 
   for (const { paramNames, handlerBody } of findMCPToolHandlers(sourceFile, options)) {
     if (!handlerBody || paramNames.length === 0) continue;
 
     const tainted = getTaintedNames(handlerBody, paramNames);
-    const calls = handlerBody.getDescendantsOfKind(SyntaxKind.CallExpression);
+    scanBody(handlerBody, tainted, "high", findings);
 
-    for (const call of calls) {
-      const callText = call.getExpression().getText();
-      const funcName = callText.split(".").pop() ?? callText;
-
-      if (!DANGEROUS_SINKS.has(funcName)) continue;
-
-      const args = call.getArguments();
-      if (args.length === 0) continue;
-
-      const firstArg = args[0];
-      const matched = findTaintedReaching(firstArg, tainted);
-
-      if (matched) {
-        const lineNum = call.getStartLineNumber();
-        const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
-
-        findings.push({
-          rule: "mcp-command-injection",
-          severity: "critical",
-          cwe: "CWE-78",
-          file: filePath,
-          line: lineNum,
-          column,
-          message: `MCP tool handler parameter flows to ${funcName}() without sanitization`,
-          evidence: extractSnippet(sourceFile, lineNum, 3),
-          remediation:
-            "Use execFile() with a fixed command and validated argument list. Never pass user-controlled input directly to exec/spawn.",
-          confidence: "high",
-          taintChain: [...matched.chain, `${funcName}() (line ${lineNum})`],
-        });
-      }
-    }
+    forEachTaintedCallTarget(handlerBody, tainted, sourceFile, (calleeBody, calleeTainted) => {
+      scanBody(calleeBody, calleeTainted, "medium", findings);
+    });
   }
 
   return findings;
+}
+
+function scanBody(
+  body: Node,
+  tainted: TaintMap,
+  confidence: "high" | "medium",
+  findings: Finding[]
+): void {
+  const sourceFile = body.getSourceFile();
+  const filePath = sourceFile.getFilePath();
+
+  for (const call of body.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const callText = call.getExpression().getText();
+    const funcName = callText.split(".").pop() ?? callText;
+    if (!DANGEROUS_SINKS.has(funcName)) continue;
+
+    const args = call.getArguments();
+    if (args.length === 0) continue;
+
+    const matched = findTaintedReaching(args[0], tainted);
+    if (!matched) continue;
+
+    const lineNum = call.getStartLineNumber();
+    const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
+
+    findings.push({
+      rule: "mcp-command-injection",
+      severity: "critical",
+      cwe: "CWE-78",
+      file: filePath,
+      line: lineNum,
+      column,
+      message: `MCP tool handler parameter flows to ${funcName}() without sanitization`,
+      evidence: extractSnippet(sourceFile, lineNum, 3),
+      remediation:
+        "Use execFile() with a fixed command and validated argument list. Never pass user-controlled input directly to exec/spawn.",
+      confidence,
+      taintChain: [...matched.chain, `${funcName}() (line ${lineNum})`],
+    });
+  }
 }
