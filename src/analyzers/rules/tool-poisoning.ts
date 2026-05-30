@@ -10,7 +10,9 @@
  *   - Description strings exceeding 2000 chars (likely instruction smuggling)
  *
  * One finding per registration call so multiple issues on the same line don't
- * get squashed by the rule-level dedup. Severity: high, confidence: medium.
+ * get squashed by the rule-level dedup. Severity/confidence are conditional:
+ * high/medium for hard signals (bad name, injection phrase, hidden unicode),
+ * medium/low for soft-only signals (e.g. a runtime-computed description).
  */
 
 import { SourceFile, SyntaxKind, Node, CallExpression } from "ts-morph";
@@ -91,7 +93,7 @@ export function detectToolPoisoning(sourceFile: SourceFile): Finding[] {
           issues.push({ where: "description", detail });
         }
       } else if (desc.dynamic) {
-        // L8: a runtime-computed description can smuggle instructions we can't see.
+        // A runtime-computed description can smuggle instructions we can't see.
         issues.push({
           where: "description",
           detail: "is computed at runtime — not statically inspectable; review manually",
@@ -184,17 +186,27 @@ function collectDescriptionStrings(
 
     for (const prop of obj.getProperties()) {
       const pa = prop.asKind(SyntaxKind.PropertyAssignment);
-      if (!pa) continue;
-      const propName = pa.getNameNode().getText().replace(/['"]/g, "");
-      if (propName !== "description" && propName !== "title") continue;
-      const init = pa.getInitializer();
-      if (!init) continue;
-      const value = stringLiteralValue(init);
-      if (value !== undefined) {
-        results.push({ value });
-      } else {
-        // description present but not a static string literal (identifier, call,
-        // concatenation, template with substitutions) → runtime-computed.
+      if (pa) {
+        const propName = pa.getNameNode().getText().replace(/['"]/g, "");
+        if (propName !== "description" && propName !== "title") continue;
+        const init = pa.getInitializer();
+        if (!init) continue;
+        const value = stringLiteralValue(init);
+        if (value !== undefined) {
+          results.push({ value });
+        } else {
+          // description present but not a static string literal (identifier, call,
+          // concatenation, template with substitutions) → runtime-computed.
+          results.push({ dynamic: true });
+        }
+        continue;
+      }
+      const spa = prop.asKind(SyntaxKind.ShorthandPropertyAssignment);
+      if (spa) {
+        const propName = spa.getNameNode().getText();
+        if (propName !== "description" && propName !== "title") continue;
+        // Shorthand `{ description }` resolves to an identifier in scope —
+        // its value isn't a literal we can inspect.
         results.push({ dynamic: true });
       }
     }
