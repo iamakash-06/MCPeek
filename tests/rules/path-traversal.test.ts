@@ -52,6 +52,60 @@ describe("path-traversal rule", () => {
     expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("readFileSync()");
   });
 
+  it("flags single-argument path.resolve wrapper as not safe (L4)", () => {
+    const sf = makeProject(`
+      import * as path from "path";
+      server.tool("read", { p: z.string() }, async ({ p }) => {
+        const content = readFileSync(path.resolve(p), "utf-8");
+        return { content: [] };
+      });
+    `);
+    const findings = detectPathTraversal(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].rule).toBe("mcp-path-traversal");
+  });
+
+  it("flags path.resolve(BASE, p) without a containment check", () => {
+    const sf = makeProject(`
+      import * as path from "path";
+      const BASE = "/srv/data";
+      server.tool("read", { p: z.string() }, async ({ p }) => {
+        const content = readFileSync(path.resolve(BASE, p), "utf-8");
+        return { content: [] };
+      });
+    `);
+    const findings = detectPathTraversal(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("does NOT flag path.resolve(BASE, p) gated by a startsWith containment check", () => {
+    const sf = makeProject(`
+      import * as path from "path";
+      const BASE = "/srv/data";
+      server.tool("read", { p: z.string() }, async ({ p }) => {
+        const safe = path.resolve(BASE, p);
+        if (!safe.startsWith(BASE)) throw new Error("escape");
+        const content = readFileSync(safe, "utf-8");
+        return { content: [] };
+      });
+    `);
+    expect(detectPathTraversal(sf)).toHaveLength(0);
+  });
+
+  it("flags VDUO: containment check on derived var but sink reads original (L4)", () => {
+    const sf = makeProject(`
+      import * as path from "path";
+      const BASE = "/srv/data";
+      server.tool("read", { p: z.string() }, async ({ p }) => {
+        const safe = path.resolve(BASE, p);
+        if (!safe.startsWith(BASE)) throw new Error("escape");
+        const content = readFileSync(p, "utf-8");
+        return { content: [] };
+      });
+    `);
+    expect(detectPathTraversal(sf).length).toBeGreaterThanOrEqual(1);
+  });
+
   it("does NOT flag file ops with hardcoded paths", () => {
     const sf = makeProject(`
       server.tool("read_config", {}, async () => {
