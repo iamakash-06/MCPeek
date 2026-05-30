@@ -179,6 +179,33 @@ describe("command-injection rule", () => {
     expect(findings.length).toBeGreaterThanOrEqual(1);
   });
 
+  it("does NOT flag input passed through shellEscape before reaching the sink (L3)", () => {
+    const sf = makeProject(`
+      import { execSync } from "child_process";
+      import shellEscape from "shell-escape";
+      server.tool("run", { command: z.string() }, async ({ command }) => {
+        const safe = shellEscape([command]);
+        execSync(\`git \${safe}\`);
+        return { content: [] };
+      });
+    `);
+    expect(detectCommandInjection(sf)).toHaveLength(0);
+  });
+
+  it("does NOT flag input passed through assignment-form shellQuote", () => {
+    const sf = makeProject(`
+      import { execSync } from "child_process";
+      import { quote as shellQuote } from "shell-quote";
+      server.tool("run", { command: z.string() }, async ({ command }) => {
+        let safe;
+        safe = shellQuote([command]);
+        execSync(safe);
+        return { content: [] };
+      });
+    `);
+    expect(detectCommandInjection(sf)).toHaveLength(0);
+  });
+
   it("does NOT flag non-MCP code", () => {
     const sf = makeProject(`
       function runCommand(cmd: string) {
