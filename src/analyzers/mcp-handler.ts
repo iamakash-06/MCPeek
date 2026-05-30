@@ -14,6 +14,7 @@ import {
   Node,
   ArrowFunction,
   FunctionExpression,
+  FunctionDeclaration,
   BindingElement,
 } from "ts-morph";
 
@@ -37,6 +38,29 @@ export interface HandlerScanOptions {
    * on normal SDK context usage.
    */
   taintContextParam?: boolean;
+}
+
+type HandlerFn = ArrowFunction | FunctionExpression | FunctionDeclaration;
+
+function resolveHandlerFunction(node: Node): HandlerFn | undefined {
+  if (Node.isArrowFunction(node) || Node.isFunctionExpression(node)) return node;
+
+  const ident = node.asKind(SyntaxKind.Identifier);
+  if (!ident) return undefined;
+
+  try {
+    for (const def of ident.getDefinitionNodes()) {
+      if (Node.isFunctionDeclaration(def)) return def;
+      const varDecl = def.asKind(SyntaxKind.VariableDeclaration);
+      const init = varDecl?.getInitializer();
+      if (init && (Node.isArrowFunction(init) || Node.isFunctionExpression(init))) {
+        return init;
+      }
+    }
+  } catch {
+    // unresolved identifier — fall through
+  }
+  return undefined;
 }
 
 function isMCPRegistration(text: string, extraRegistrations: string[]): boolean {
@@ -73,10 +97,7 @@ export function findMCPToolHandlers(
     // server.tool(name, handler)          → args[1] is handler
     // server.tool(name, schema, handler)  → args[2] is handler
     const lastArg = args[args.length - 1];
-    const handlerFn: ArrowFunction | FunctionExpression | undefined =
-      Node.isArrowFunction(lastArg) || Node.isFunctionExpression(lastArg)
-        ? lastArg
-        : undefined;
+    const handlerFn = resolveHandlerFunction(lastArg);
 
     if (!handlerFn) continue;
 
