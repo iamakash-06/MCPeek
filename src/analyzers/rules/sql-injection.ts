@@ -128,7 +128,7 @@ function buildFinding(
   filePath: string
 ): Finding {
   const lineNum = node.getStartLineNumber();
-  const chain = tainted.get(matchedName)!;
+  const chain = tainted.get(matchedName)!.chain;
   const { column } = sourceFile.getLineAndColumnAtPos(node.getStart());
 
   return {

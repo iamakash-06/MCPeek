@@ -68,7 +68,7 @@ export function detectSSRF(
 
       if (!hasAllowlist) {
         const lineNum = call.getStartLineNumber();
-        const chain = tainted.get(matchedName)!;
+        const chain = tainted.get(matchedName)!.chain;
         const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());
 
         findings.push({
