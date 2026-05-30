@@ -1,38 +1,42 @@
 /**
  * Intra-function taint tracking for TypeScript MCP handler bodies.
  *
- * Given a set of source parameter names, walks all variable declarations
- * and assignments in a handler body and builds a taint map — every identifier
- * that carries tainted data, keyed to the full chain of aliases that led there.
+ * Given a set of source parameter names, walks variable declarations and
+ * assignments in a handler body and returns a TaintMap: every alias that
+ * carries tainted data, keyed by its expression text.
  *
- * Returned map shape:
- *   "cmd"       → ["cmd (handler param)"]
- *   "command"   → ["cmd (handler param)", "command (line 3)"]
- *   "sanitized" → ["cmd (handler param)", "command (line 3)", "sanitized (line 5)"]
+ * Map keys:
+ *   "cmd"          → handler param
+ *   "command"      → const command = cmd
+ *   "opts.command" → opts.command = cmd
  *
- * Handles:
- *   const x = param                      → x is tainted
- *   const url = `https://host/${param}`  → url is tainted
- *   const path = baseDir + "/" + param   → path is tainted
- *   let out; out = buildCmd(param)       → out is tainted (conservative)
+ * Each entry carries:
+ *   chain — breadcrumb strings used by the SARIF / Markdown reporters
+ *   path  — dotted property path from the root, e.g. ["opts","command"]
+ *   root  — the original handler-param name the chain stems from
  */
 
 import { Node, SyntaxKind } from "ts-morph";
 
-export type TaintMap = Map<string, string[]>;
+export interface TaintEntry {
+  chain: string[];
+  path: string[];
+  root: string;
+}
+
+export type TaintMap = Map<string, TaintEntry>;
 
 export function getTaintedNames(
   handlerBody: Node,
   paramNames: string[]
 ): TaintMap {
-  // Seed: each param starts its own chain
-  const tainted: TaintMap = new Map(
-    paramNames.map((p) => [p, [`${p} (handler param)`]])
-  );
+  const tainted: TaintMap = new Map();
+  for (const p of paramNames) {
+    tainted.set(p, { chain: [`${p} (handler param)`], path: [p], root: p });
+  }
 
   const decls = handlerBody.getDescendantsOfKind(SyntaxKind.VariableDeclaration);
 
-  // Multiple passes: chains like (x = param; y = x; z = y) need pass ordering
   let changed = true;
   let passes = 0;
   while (changed && passes < 4) {
@@ -47,29 +51,35 @@ export function getTaintedNames(
       if (!nameNode) continue;
 
       if (nameNode.getKind() === SyntaxKind.Identifier) {
-        // Simple: const x = taintedExpr
         const name = nameNode.getText();
         if (tainted.has(name)) continue;
 
         const match = findFirstTaintedIn(init, tainted);
         if (match) {
+          const src = tainted.get(match)!;
           const line = decl.getStartLineNumber();
-          tainted.set(name, [...tainted.get(match)!, `${name} (line ${line})`]);
+          tainted.set(name, {
+            chain: [...src.chain, `${name} (line ${line})`],
+            path: [name],
+            root: src.root,
+          });
           changed = true;
         }
       } else if (nameNode.getKind() === SyntaxKind.ObjectBindingPattern) {
-        // Destructuring: const { a, b: c } = taintedExpr
-        // If the initializer is tainted, all bound names inherit the taint.
         const match = findFirstTaintedIn(init, tainted);
         if (!match) continue;
-
+        const src = tainted.get(match)!;
         const line = decl.getStartLineNumber();
         nameNode
           .getDescendantsOfKind(SyntaxKind.BindingElement)
           .forEach((el: any) => {
             const elName = el.getNameNode?.()?.getText();
             if (elName && !tainted.has(elName)) {
-              tainted.set(elName, [...tainted.get(match)!, `${elName} (line ${line})`]);
+              tainted.set(elName, {
+                chain: [...src.chain, `${elName} (line ${line})`],
+                path: [elName],
+                root: src.root,
+              });
               changed = true;
             }
           });
@@ -77,27 +87,29 @@ export function getTaintedNames(
     }
   }
 
-  // Also catch imperative assignments: let x; x = param
+  // Imperative assignments: `let x; x = param` and `opts.field = param`
   const assignments = handlerBody.getDescendantsOfKind(SyntaxKind.BinaryExpression);
   for (const assign of assignments) {
     if (assign.getOperatorToken().getText() !== "=") continue;
-    const varName = assign.getLeft().getText().trim();
-    if (tainted.has(varName)) continue;
+    const lhsText = assign.getLeft().getText().trim();
+    if (tainted.has(lhsText)) continue;
 
     const match = findFirstTaintedIn(assign.getRight(), tainted);
-    if (match) {
-      const line = assign.getStartLineNumber();
-      tainted.set(varName, [...tainted.get(match)!, `${varName} (line ${line})`]);
-    }
+    if (!match) continue;
+
+    const src = tainted.get(match)!;
+    const line = assign.getStartLineNumber();
+    const lhsPath = lhsText.split(".");
+    tainted.set(lhsText, {
+      chain: [...src.chain, `${lhsText} (line ${line})`],
+      path: lhsPath,
+      root: lhsPath[0] || src.root,
+    });
   }
 
   return tainted;
 }
 
-/**
- * Returns the first tainted name whose text appears anywhere inside `node`,
- * or undefined if none match.
- */
 export function findFirstTaintedIn(node: Node, tainted: TaintMap): string | undefined {
   const identifiers = getIdentifierTexts(node);
   for (const name of tainted.keys()) {
@@ -106,9 +118,6 @@ export function findFirstTaintedIn(node: Node, tainted: TaintMap): string | unde
   return undefined;
 }
 
-/**
- * Returns true if the node's text contains any name from the tainted set.
- */
 export function nodeContainsTainted(node: Node, tainted: Set<string>): boolean {
   const identifiers = getIdentifierTexts(node);
   for (const name of tainted) {
@@ -122,11 +131,8 @@ function getIdentifierTexts(node: Node): Set<string> {
   if (node.getKind() === SyntaxKind.Identifier) {
     names.add(node.getText());
   }
-
   node
     .getDescendantsOfKind(SyntaxKind.Identifier)
     .forEach((id) => names.add(id.getText()));
-
   return names;
 }
-

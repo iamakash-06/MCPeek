@@ -47,7 +47,7 @@ export function detectCodeInjection(
           lineNum,
           column,
           `${funcName}()`,
-          tainted.get(matchedName)!,
+          tainted.get(matchedName)!.chain,
           sourceFile
         )
       );
@@ -74,7 +74,7 @@ export function detectCodeInjection(
           lineNum,
           column,
           `new ${ctorName}()`,
-          tainted.get(matchedName)!,
+          tainted.get(matchedName)!.chain,
           sourceFile
         )
       );
