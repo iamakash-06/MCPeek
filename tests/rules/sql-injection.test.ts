@@ -137,4 +137,31 @@ describe("sql-injection rule", () => {
     `);
     expect(detectSqlInjection(sf)).toHaveLength(1);
   });
+
+  it("flags query() on a custom-named receiver typed as Pool (L10)", () => {
+    const sf = makeProject(`
+      declare class Pool { query(sql: string): any }
+      const myStore: Pool = {} as any;
+      server.tool("get", { id: z.string() }, async ({ id }) => {
+        const sql = \`SELECT * FROM users WHERE id = '\${id}'\`;
+        return myStore.query(sql);
+      });
+    `);
+    const findings = detectSqlInjection(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].rule).toBe("mcp-sql-injection");
+  });
+
+  it("flags query() on a receiver initialized via new Pool() (L10)", () => {
+    const sf = makeProject(`
+      declare const Pool: any;
+      const myStore = new Pool();
+      server.tool("get", { id: z.string() }, async ({ id }) => {
+        const sql = \`SELECT * FROM users WHERE id = '\${id}'\`;
+        return myStore.query(sql);
+      });
+    `);
+    const findings = detectSqlInjection(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+  });
 });

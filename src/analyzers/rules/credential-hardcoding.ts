@@ -131,6 +131,40 @@ export function detectHardcodedCredentials(sourceFile: SourceFile): Finding[] {
     });
   }
 
+  // Value-shape pass: catch known-prefix secrets bound to non-credential variable names
+  // (e.g. `const ANTHROPIC = "sk-ant-..."`) that the name-based passes above miss.
+  const reportedLines = new Set(findings.map((f) => f.line));
+  const literals = [
+    ...sourceFile.getDescendantsOfKind(SyntaxKind.StringLiteral),
+    ...sourceFile.getDescendantsOfKind(SyntaxKind.NoSubstitutionTemplateLiteral),
+  ];
+  for (const lit of literals) {
+    const lineNum = lit.getStartLineNumber();
+    if (reportedLines.has(lineNum)) continue;
+
+    const value = lit.getText().replace(/^['"`]|['"`]$/g, "");
+    if (value.length < MIN_SUSPICIOUS_LENGTH) continue;
+    if (isPlaceholder(value)) continue;
+    if (!CREDENTIAL_VALUE_PATTERNS.some((p) => p.test(value))) continue;
+
+    const redacted = value.slice(0, 6) + "..." + value.slice(-4);
+    const { column } = sourceFile.getLineAndColumnAtPos(lit.getStart());
+    findings.push({
+      rule: "mcp-hardcoded-credential",
+      severity: "high",
+      cwe: "CWE-798",
+      file: filePath,
+      line: lineNum,
+      column,
+      message: `Hardcoded credential literal (value: ${redacted})`,
+      evidence: extractSnippet(sourceFile, lineNum, 1),
+      remediation:
+        "Move credentials to environment variables: process.env.YOUR_KEY_NAME",
+      confidence: "high",
+    });
+    reportedLines.add(lineNum);
+  }
+
   return findings;
 }
 
