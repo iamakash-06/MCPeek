@@ -26,10 +26,37 @@ export interface TaintEntry {
 
 export type TaintMap = Map<string, TaintEntry>;
 
+export interface TaintOptions {
+  /**
+   * Function names that neutralise their tainted argument: when the RHS of an
+   * assignment is a call to one of these, the LHS is not propagated as tainted.
+   * Defaults cover `shell-escape`, `shell-quote`, and common sanitiser names.
+   */
+  extraBreakers?: string[];
+}
+
+const DEFAULT_TAINT_BREAKERS = new Set([
+  "shellEscape",
+  "shellQuote",
+  "shellescape",
+  "shellquote",
+  "escape",
+  "quote",
+  "sanitize",
+  "sanitizeHtml",
+  "sanitizeUrl",
+  "sanitizePath",
+  "validateAndNormalize",
+  "encodeURIComponent",
+]);
+
 export function getTaintedNames(
   handlerBody: Node,
-  paramNames: string[]
+  paramNames: string[],
+  options: TaintOptions = {}
 ): TaintMap {
+  const breakers = new Set(DEFAULT_TAINT_BREAKERS);
+  for (const name of options.extraBreakers ?? []) breakers.add(name);
   const tainted: TaintMap = new Map();
   for (const p of paramNames) {
     tainted.set(p, { chain: [`${p} (handler param)`], path: [p], root: p });
@@ -46,6 +73,7 @@ export function getTaintedNames(
     for (const decl of decls) {
       const init = decl.getInitializer();
       if (!init) continue;
+      if (isSanitizerCall(init, breakers)) continue;
 
       const nameNode = (decl as any).getNameNode?.();
       if (!nameNode) continue;
@@ -94,7 +122,10 @@ export function getTaintedNames(
     const lhsText = assign.getLeft().getText().trim();
     if (tainted.has(lhsText)) continue;
 
-    const match = findFirstTaintedIn(assign.getRight(), tainted);
+    const rhs = assign.getRight();
+    if (isSanitizerCall(rhs, breakers)) continue;
+
+    const match = findFirstTaintedIn(rhs, tainted);
     if (!match) continue;
 
     const src = tainted.get(match)!;
@@ -128,6 +159,14 @@ export function nodeContainsTainted(node: Node, tainted: Set<string>): boolean {
     if (identifiers.has(name)) return true;
   }
   return false;
+}
+
+function isSanitizerCall(node: Node, breakers: Set<string>): boolean {
+  const call = node.asKind(SyntaxKind.CallExpression);
+  if (!call) return false;
+  const callee = call.getExpression().getText();
+  const name = callee.split(".").pop() ?? callee;
+  return breakers.has(name);
 }
 
 function getIdentifierTexts(node: Node): Set<string> {
