@@ -1,6 +1,7 @@
 import { SourceFile, SyntaxKind } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { extractSnippet } from "../snippet.js";
+import { resolveSchemaDefinition } from "../cross-file.js";
 
 export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] {
   const findings: Finding[] = [];
@@ -61,7 +62,8 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
     // server.tool(name, schema, handler) — check if schema uses raw z.any() or z.unknown()
     if (args.length >= 3) {
       const schemaArg = args[1];
-      const schemaText = schemaArg.getText();
+      const resolvedSchema = resolveSchemaDefinition(schemaArg);
+      const schemaText = resolvedSchema.getText();
 
       if (schemaText.includes("z.any()") || schemaText.includes("z.unknown()")) {
         const lineNum = call.getStartLineNumber();

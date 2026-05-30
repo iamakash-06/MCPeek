@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Project } from "ts-morph";
 import { detectMissingInputValidation } from "../../src/analyzers/rules/input-validation.js";
+import { makeMultiFileProject } from "../helpers/multi-file-project.js";
 
 function makeProject(code: string) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -28,6 +29,30 @@ describe("input-validation rule", () => {
       });
     `);
     const findings = detectMissingInputValidation(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].rule).toBe("mcp-weak-input-validation");
+  });
+
+  it("detects an imported schema bound to z.any() across files (L2)", () => {
+    const project = makeMultiFileProject([
+      {
+        name: "schemas.ts",
+        code: `
+          import { z } from "zod";
+          export const SearchSchema = { query: z.any() };
+        `,
+      },
+      {
+        name: "server.ts",
+        code: `
+          import { SearchSchema } from "./schemas.js";
+          server.tool("search", SearchSchema, async ({ query }) => {
+            return { content: [] };
+          });
+        `,
+      },
+    ]);
+    const findings = detectMissingInputValidation(project.getSourceFileOrThrow("server.ts"));
     expect(findings.length).toBeGreaterThanOrEqual(1);
     expect(findings[0].rule).toBe("mcp-weak-input-validation");
   });

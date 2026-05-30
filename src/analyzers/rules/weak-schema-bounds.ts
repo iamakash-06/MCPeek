@@ -14,6 +14,7 @@
 import { SourceFile, SyntaxKind, Node } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { extractSnippet } from "../snippet.js";
+import { resolveSchemaDefinition } from "../cross-file.js";
 
 const STRING_BOUND_METHODS = new Set([
   "min", "max", "length",
@@ -85,7 +86,7 @@ export function detectWeakSchemaBounds(sourceFile: SourceFile): Finding[] {
 function findWeakFields(schemaNode: Node): string[] {
   // If the schema was passed by reference (`server.tool("x", schemaVar, handler)`),
   // follow the binding to its initializer before inspecting.
-  schemaNode = resolveAliasChain(schemaNode);
+  schemaNode = resolveSchemaDefinition(schemaNode);
 
   // Unwrap z.object({...}) → inner object literal
   const asCall = schemaNode.asKind(SyntaxKind.CallExpression);
@@ -111,29 +112,6 @@ function findWeakFields(schemaNode: Node): string[] {
     if (isWeakZodValue(value)) weak.push(fieldName);
   }
   return weak;
-}
-
-/**
- * Follows an Identifier to its variable-declaration initializer, repeating
- * to handle short alias chains (`const a = obj; const b = a;`). Returns the
- * original node unchanged if it isn't an Identifier or can't be resolved.
- */
-function resolveAliasChain(node: Node, depth = 0): Node {
-  if (depth > 4) return node;
-  const ident = node.asKind(SyntaxKind.Identifier);
-  if (!ident) return node;
-  try {
-    for (const def of ident.getDefinitionNodes()) {
-      const varDecl = def.asKind(SyntaxKind.VariableDeclaration);
-      if (!varDecl) continue;
-      const init = varDecl.getInitializer();
-      if (init) return resolveAliasChain(init, depth + 1);
-    }
-  } catch {
-    // Unresolved identifier (e.g. import from a package not in the project) —
-    // fall through and return the original node.
-  }
-  return node;
 }
 
 function isWeakZodValue(node: Node): boolean {
