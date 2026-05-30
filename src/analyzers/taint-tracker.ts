@@ -111,6 +111,10 @@ export function getTaintedNames(
 }
 
 export function findFirstTaintedIn(node: Node, tainted: TaintMap): string | undefined {
+  for (const pa of node.getDescendantsOfKind(SyntaxKind.PropertyAccessExpression)) {
+    const text = pa.getText();
+    if (tainted.has(text)) return text;
+  }
   const identifiers = getIdentifierTexts(node);
   for (const name of tainted.keys()) {
     if (identifiers.has(name)) return name;

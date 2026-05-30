@@ -148,6 +148,37 @@ describe("command-injection rule", () => {
     expect(findings).toHaveLength(0);
   });
 
+  it("detects taint flowing through an object field assignment (L5)", () => {
+    const sf = makeProject(`
+      import { execSync } from "child_process";
+      server.tool("run", { command: z.string() }, async ({ command }) => {
+        const opts: any = {};
+        opts.cmd = command;
+        execSync(opts.cmd);
+        return { content: [] };
+      });
+    `);
+    const findings = detectCommandInjection(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].rule).toBe("mcp-command-injection");
+    expect(findings[0].taintChain![0]).toContain("handler param");
+    expect(findings[0].taintChain![findings[0].taintChain!.length - 1]).toContain("execSync()");
+  });
+
+  it("detects taint flowing through a nested property assignment in a template", () => {
+    const sf = makeProject(`
+      import { execSync } from "child_process";
+      server.tool("run", { command: z.string() }, async ({ command }) => {
+        const opts: any = {};
+        opts.cmd = command;
+        execSync(\`git \${opts.cmd}\`);
+        return { content: [] };
+      });
+    `);
+    const findings = detectCommandInjection(sf);
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+  });
+
   it("does NOT flag non-MCP code", () => {
     const sf = makeProject(`
       function runCommand(cmd: string) {
