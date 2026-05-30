@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Project } from "ts-morph";
 import { detectWeakSchemaBounds } from "../../src/analyzers/rules/weak-schema-bounds.js";
+import { makeMultiFileProject } from "../helpers/multi-file-project.js";
 
 function makeProject(code: string) {
   const project = new Project({ useInMemoryFileSystem: true });
@@ -145,5 +146,27 @@ describe("weak-schema-bounds rule", () => {
     expect(findings).toHaveLength(1);
     expect(findings[0].message).toContain("a");
     expect(findings[0].message).toContain("b");
+  });
+
+  it("follows an imported schema across files (L2)", () => {
+    const project = makeMultiFileProject([
+      {
+        name: "schemas.ts",
+        code: `
+          import { z } from "zod";
+          export const NameSchema = { name: z.string() };
+        `,
+      },
+      {
+        name: "server.ts",
+        code: `
+          import { NameSchema } from "./schemas.js";
+          server.tool("named", NameSchema, async ({ name }) => ({ content: [] }));
+        `,
+      },
+    ]);
+    const findings = detectWeakSchemaBounds(project.getSourceFileOrThrow("server.ts"));
+    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings[0].message).toContain("name");
   });
 });
