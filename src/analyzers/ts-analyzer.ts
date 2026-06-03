@@ -47,6 +47,19 @@ export async function analyzeTypeScript(
 ): Promise<AnalyzeResult> {
   const tsConfig = findTsConfig(projectRoot);
 
+  const fileFilter = (f: ReturnType<Project["getSourceFiles"]>[0]) => {
+    const fp = f.getFilePath();
+    return (
+      !fp.includes("node_modules") &&
+      !fp.includes("/dist/") &&
+      !fp.includes("/build/") &&
+      !fp.endsWith(".d.ts") &&
+      // L15: example/test files are skipped by default, but a shipped vulnerable
+      // example server can be a real risk — --include-tests opts them back in.
+      (options.includeTests || !isTestFile(fp))
+    );
+  };
+
   let project: Project;
 
   if (tsConfig) {
@@ -59,18 +72,20 @@ export async function analyzeTypeScript(
     ]);
   }
 
-  const sourceFiles = project.getSourceFiles().filter((f) => {
-    const fp = f.getFilePath();
-    return (
-      !fp.includes("node_modules") &&
-      !fp.includes("/dist/") &&
-      !fp.includes("/build/") &&
-      !fp.endsWith(".d.ts") &&
-      // L15: example/test files are skipped by default, but a shipped vulnerable
-      // example server can be a real risk — --include-tests opts them back in.
-      (options.includeTests || !isTestFile(fp))
-    );
-  });
+  let sourceFiles = project.getSourceFiles().filter(fileFilter);
+
+  // Project-references pattern: root tsconfig has `"files":[]` + `"references":[...]`.
+  // ts-morph reads the root config, sees an empty file list, and adds nothing —
+  // it does not follow project references. Detect this by checking for zero files
+  // after loading a tsconfig, then fall back to glob so these repos are fully scanned.
+  if (sourceFiles.length === 0 && tsConfig) {
+    const fallback = new Project({ useInMemoryFileSystem: false });
+    fallback.addSourceFilesAtPaths([
+      join(projectRoot, "**/*.ts"),
+      join(projectRoot, "**/*.js"),
+    ]);
+    sourceFiles = fallback.getSourceFiles().filter(fileFilter);
+  }
 
   const activeRules: RuleName[] = options.rules
     ? (options.rules.filter((r) => ALL_RULES.includes(r as RuleName)) as RuleName[])
