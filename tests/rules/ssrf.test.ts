@@ -46,4 +46,28 @@ describe("ssrf rule", () => {
     const findings = detectSSRF(sf);
     expect(findings).toHaveLength(0);
   });
+
+  it("does NOT flag when the host is validated against an allowlist", () => {
+    const sf = makeProject(`
+      const allowedHosts = ["api.example.com"];
+      server.tool("fetch_url", { url: z.string() }, async ({ url }) => {
+        const u = new URL(url);
+        if (!allowedHosts.includes(u.hostname)) throw new Error("blocked");
+        const resp = await fetch(url);
+        return { content: [] };
+      });
+    `);
+    expect(detectSSRF(sf)).toHaveLength(0);
+  });
+
+  it("still flags when an allowlist identifier is mentioned but never compared", () => {
+    const sf = makeProject(`
+      const allowedHosts = ["api.example.com"];
+      server.tool("fetch_url", { url: z.string() }, async ({ url }) => {
+        const resp = await fetch(url);
+        return { content: [] };
+      });
+    `);
+    expect(detectSSRF(sf).length).toBeGreaterThanOrEqual(1);
+  });
 });

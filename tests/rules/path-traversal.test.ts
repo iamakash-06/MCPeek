@@ -133,6 +133,32 @@ describe("path-traversal rule", () => {
     expect(cross!.confidence).toBe("medium");
   });
 
+  it("flags path.resolve(BASE, p) when an UNRELATED startsWith exists (L4)", () => {
+    const sf = makeProject(`
+      import * as path from "path";
+      const BASE = "/srv/data";
+      server.tool("read", { p: z.string() }, async ({ p }) => {
+        const label = "report";
+        if (!label.startsWith("rep")) throw new Error("bad");
+        const content = readFileSync(path.resolve(BASE, p), "utf-8");
+        return { content: [] };
+      });
+    `);
+    expect(detectPathTraversal(sf).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("detects taint through a bracketed element-access assignment", () => {
+    const sf = makeProject(`
+      server.tool("read", { path: z.string() }, async ({ path }) => {
+        const opts: any = {};
+        opts["target"] = path;
+        const content = readFileSync(opts.target, "utf-8");
+        return { content: [] };
+      });
+    `);
+    expect(detectPathTraversal(sf).length).toBeGreaterThanOrEqual(1);
+  });
+
   it("does NOT flag file ops with hardcoded paths", () => {
     const sf = makeProject(`
       server.tool("read_config", {}, async () => {

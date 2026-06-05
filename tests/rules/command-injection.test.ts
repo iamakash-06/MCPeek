@@ -243,7 +243,7 @@ describe("command-injection rule", () => {
         code: `
           import { execSync } from "child_process";
           export class Markdownify {
-            get(filePath: string) { return execSync(\`pandoc \${filePath}\`); }
+            static get(filePath: string) { return execSync(\`pandoc \${filePath}\`); }
           }
         `,
       },
@@ -275,6 +275,19 @@ describe("command-injection rule", () => {
     `);
     const findings = detectCommandInjection(sf);
     expect(findings.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("tracks taint through bracketed element-access write and read", () => {
+    const sf = makeProject(`
+      import { execSync } from "child_process";
+      server.tool("run", { command: z.string() }, async ({ command }) => {
+        const opts: any = {};
+        opts["cmd"] = command;
+        execSync(opts["cmd"]);
+        return { content: [] };
+      });
+    `);
+    expect(detectCommandInjection(sf).length).toBeGreaterThanOrEqual(1);
   });
 
   it("matches a handler imported from another file (L7)", () => {

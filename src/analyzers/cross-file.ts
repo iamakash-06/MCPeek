@@ -33,6 +33,8 @@ export function resolveSchemaDefinition(node: Node, depth = 0): Node {
 
 export interface ResolvedCallee {
   paramNames: string[];
+  /** Positional, one entry per parameter: the identifier names it binds. */
+  paramBindings: string[][];
   body: Node;
   file: string;
   fnName: string;
@@ -66,7 +68,41 @@ export function resolveCallee(
   if (segments.length === 2) {
     const [receiver, method] = segments;
     if (LIBRARY_RECEIVERS.has(receiver)) return undefined;
-    return resolveImportedClassMethod(receiver, method, sourceFile);
+    return (
+      resolveNamespaceExportFunction(receiver, method, sourceFile) ??
+      resolveImportedClassMethod(receiver, method, sourceFile)
+    );
+  }
+  return undefined;
+}
+
+function resolveNamespaceExportFunction(
+  receiver: string,
+  method: string,
+  sf: SourceFile
+): ResolvedCallee | undefined {
+  const target = followNamespaceImport(sf, receiver);
+  if (!target) return undefined;
+
+  const fn = target.getFunction(method);
+  if (fn) {
+    const body = fn.getBody();
+    if (body) {
+      return makeResolved(fn.getParameters(), body, target.getFilePath(), `${receiver}.${method}`);
+    }
+  }
+
+  for (const v of target.getVariableDeclarations()) {
+    if (v.getName() !== method) continue;
+    const init = v.getInitializer();
+    const arrow = init?.asKind(SyntaxKind.ArrowFunction);
+    const fnExpr = init?.asKind(SyntaxKind.FunctionExpression);
+    const f = arrow ?? fnExpr;
+    if (!f) continue;
+    const body = f.getBody();
+    if (body) {
+      return makeResolved(f.getParameters(), body, target.getFilePath(), `${receiver}.${method}`);
+    }
   }
   return undefined;
 }
@@ -132,6 +168,15 @@ function followImport(sf: SourceFile, name: string): SourceFile | undefined {
   return undefined;
 }
 
+function followNamespaceImport(sf: SourceFile, name: string): SourceFile | undefined {
+  for (const imp of sf.getImportDeclarations()) {
+    if (imp.getNamespaceImport()?.getText() !== name) continue;
+    const target = imp.getModuleSpecifierSourceFile();
+    if (target) return target;
+  }
+  return undefined;
+}
+
 /**
  * For each call inside `handlerBody` whose tainted argument can be followed
  * one hop into a resolvable callee, invokes `visit` with the callee's body and
@@ -148,37 +193,37 @@ export function forEachTaintedCallTarget(
   const visited = new Set<string>();
   for (const call of handlerBody.getDescendantsOfKind(SyntaxKind.CallExpression)) {
     const args = call.getArguments();
-    let taintedArgIdx = -1;
-    let inheritedChain: string[] | undefined;
-    for (let i = 0; i < args.length; i++) {
-      const m = findTaintedReaching(args[i], tainted);
-      if (m) {
-        taintedArgIdx = i;
-        inheritedChain = m.chain;
-        break;
+    let callee: ResolvedCallee | undefined;
+    let resolved = false;
+
+    for (let argIdx = 0; argIdx < args.length; argIdx++) {
+      const m = findTaintedReaching(args[argIdx], tainted);
+      if (!m) continue;
+
+      if (!resolved) {
+        callee = resolveCallee(call, sourceFile);
+        resolved = true;
       }
+      if (!callee) break;
+
+      const bindings = callee.paramBindings[argIdx];
+      if (!bindings || bindings.length === 0) continue;
+
+      // Key by argument identity so multiple tainted params are analysed separately.
+      const key = `${callee.file}:${callee.fnName}:arg${argIdx}`;
+      if (visited.has(key)) continue;
+      visited.add(key);
+
+      const calleeTainted = getTaintedNames(callee.body, bindings);
+      for (const seedParam of bindings) {
+        const seedEntry = calleeTainted.get(seedParam);
+        if (seedEntry) {
+          seedEntry.chain = [...m.chain, `${seedParam} (arg → ${callee.fnName})`];
+        }
+      }
+
+      visit(callee.body, calleeTainted, callee.file);
     }
-    if (taintedArgIdx < 0 || !inheritedChain) continue;
-
-    const callee = resolveCallee(call, sourceFile);
-    if (!callee) continue;
-    const key = `${callee.file}:${callee.fnName}`;
-    if (visited.has(key)) continue;
-    visited.add(key);
-
-    const seedParam = callee.paramNames[taintedArgIdx];
-    if (!seedParam) continue;
-
-    const calleeTainted = getTaintedNames(callee.body, [seedParam]);
-    const seedEntry = calleeTainted.get(seedParam);
-    if (seedEntry) {
-      seedEntry.chain = [
-        ...inheritedChain,
-        `${seedParam} (arg → ${callee.fnName})`,
-      ];
-    }
-
-    visit(callee.body, calleeTainted, callee.file);
   }
 }
 
@@ -190,18 +235,22 @@ function makeResolved(
 ): ResolvedCallee | undefined {
   if (params.length > MAX_PARAMS) return undefined;
   const paramNames: string[] = [];
+  const paramBindings: string[][] = [];
   for (const param of params) {
     const binding = param.getNameNode();
+    paramNames.push(binding.getText());
     if (binding.getKind() === SyntaxKind.ObjectBindingPattern) {
+      const names: string[] = [];
       binding
         .getDescendantsOfKind(SyntaxKind.BindingElement)
         .forEach((el) => {
           const n = el.getNameNode();
-          if (n) paramNames.push(n.getText());
+          if (n) names.push(n.getText());
         });
+      paramBindings.push(names);
     } else {
-      paramNames.push(binding.getText());
+      paramBindings.push([binding.getText()]);
     }
   }
-  return { paramNames, body, file, fnName };
+  return { paramNames, paramBindings, body, file, fnName };
 }
