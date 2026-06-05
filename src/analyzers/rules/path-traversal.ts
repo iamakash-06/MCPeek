@@ -38,6 +38,10 @@ const PATH_HELPERS = new Set(["path.resolve", "path.normalize", "resolve", "norm
 function isContainedPathCall(pathArg: Node, handlerBody: Node): boolean {
   let target: Node = pathArg;
 
+  // Texts a containment guard may reference: the sink's variable, or the
+  // inlined path.resolve(...) call.
+  const resolvedTexts = new Set<string>([pathArg.getText().trim()]);
+
   const ident = pathArg.asKind(SyntaxKind.Identifier);
   if (ident) {
     try {
@@ -58,9 +62,32 @@ function isContainedPathCall(pathArg: Node, handlerBody: Node): boolean {
   const callee = call.getExpression().getText();
   if (!PATH_HELPERS.has(callee)) return false;
   if (call.getArguments().length < 2) return false;
+  resolvedTexts.add(call.getText().trim());
 
-  const body = handlerBody.getText();
-  return /\.startsWith\s*\(/.test(body) || /path\.relative\s*\(/.test(body);
+  return hasContainmentGuard(handlerBody, resolvedTexts);
+}
+
+/**
+ * True only when a `.startsWith` / `path.relative` call actually references the
+ * resolved path node, so unrelated such calls don't suppress a real finding.
+ */
+function hasContainmentGuard(scope: Node, resolvedTexts: Set<string>): boolean {
+  for (const call of scope.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const expr = call.getExpression();
+    const pa = expr.asKind(SyntaxKind.PropertyAccessExpression);
+    if (pa && pa.getName() === "startsWith") {
+      if (resolvedTexts.has(pa.getExpression().getText().trim())) return true;
+      const arg0 = call.getArguments()[0];
+      if (arg0 && resolvedTexts.has(arg0.getText().trim())) return true;
+      continue;
+    }
+    if (expr.getText() === "path.relative" || expr.getText() === "relative") {
+      if (call.getArguments().some((a) => resolvedTexts.has(a.getText().trim()))) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 export function detectPathTraversal(

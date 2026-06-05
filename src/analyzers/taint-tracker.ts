@@ -28,9 +28,9 @@ export type TaintMap = Map<string, TaintEntry>;
 
 export interface TaintOptions {
   /**
-   * Function names that neutralise their tainted argument: when the RHS of an
-   * assignment is a call to one of these, the LHS is not propagated as tainted.
-   * Defaults cover `shell-escape`, `shell-quote`, and common sanitiser names.
+   * Function names that neutralise their tainted argument. Defaults cover only
+   * vetted sanitisers; generic names like `escape`/`quote`/`sanitize` must be
+   * opted in here so an unrelated same-named helper can't suppress real taint.
    */
   extraBreakers?: string[];
 }
@@ -40,13 +40,9 @@ const DEFAULT_TAINT_BREAKERS = new Set([
   "shellQuote",
   "shellescape",
   "shellquote",
-  "escape",
-  "quote",
-  "sanitize",
   "sanitizeHtml",
   "sanitizeUrl",
   "sanitizePath",
-  "validateAndNormalize",
   "encodeURIComponent",
 ]);
 
@@ -119,8 +115,9 @@ export function getTaintedNames(
   const assignments = handlerBody.getDescendantsOfKind(SyntaxKind.BinaryExpression);
   for (const assign of assignments) {
     if (assign.getOperatorToken().getText() !== "=") continue;
-    const lhsText = assign.getLeft().getText().trim();
-    if (tainted.has(lhsText)) continue;
+    // Normalise `opts["command"]` to `opts.command` so later dotted reads match.
+    const lhsKey = canonicalAccessKey(assign.getLeft());
+    if (tainted.has(lhsKey)) continue;
 
     const rhs = assign.getRight();
     if (isSanitizerCall(rhs, breakers)) continue;
@@ -130,9 +127,9 @@ export function getTaintedNames(
 
     const src = tainted.get(match)!;
     const line = assign.getStartLineNumber();
-    const lhsPath = lhsText.split(".");
-    tainted.set(lhsText, {
-      chain: [...src.chain, `${lhsText} (line ${line})`],
+    const lhsPath = lhsKey.split(".");
+    tainted.set(lhsKey, {
+      chain: [...src.chain, `${lhsKey} (line ${line})`],
       path: lhsPath,
       root: lhsPath[0] || src.root,
     });
@@ -159,6 +156,26 @@ export function nodeContainsTainted(node: Node, tainted: Set<string>): boolean {
     if (identifiers.has(name)) return true;
   }
   return false;
+}
+
+/**
+ * Canonical dotted key for an access expression: `opts["command"]` and
+ * `opts.command` both normalise to `opts.command`. Other nodes fall back to
+ * their raw trimmed text.
+ */
+export function canonicalAccessKey(node: Node): string {
+  const ea = node.asKind(SyntaxKind.ElementAccessExpression);
+  if (ea) {
+    const lit = ea.getArgumentExpression()?.asKind(SyntaxKind.StringLiteral);
+    if (lit) {
+      return `${canonicalAccessKey(ea.getExpression())}.${lit.getLiteralText()}`;
+    }
+  }
+  const pa = node.asKind(SyntaxKind.PropertyAccessExpression);
+  if (pa) {
+    return `${canonicalAccessKey(pa.getExpression())}.${pa.getName()}`;
+  }
+  return node.getText().trim();
 }
 
 function isSanitizerCall(node: Node, breakers: Set<string>): boolean {

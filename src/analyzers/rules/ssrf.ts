@@ -37,6 +37,36 @@ export function detectSSRF(
   return findings;
 }
 
+const ALLOWLIST_METHODS = new Set(["includes", "indexOf", "has", "test", "startsWith"]);
+const HOST_RE = /host|hostname|url|origin|domain/i;
+const ALLOW_RE = /allow|whitelist|permit|safe|valid/i;
+
+/**
+ * True for a genuine host-validation comparison (allowlist method call on the
+ * host, or host equality check) rather than a mere allowlist-identifier mention.
+ */
+function hasHostValidation(scope: Node): boolean {
+  for (const call of scope.getDescendantsOfKind(SyntaxKind.CallExpression)) {
+    const pa = call.getExpression().asKind(SyntaxKind.PropertyAccessExpression);
+    if (!pa) continue;
+    if (!ALLOWLIST_METHODS.has(pa.getName())) continue;
+    const receiver = pa.getExpression().getText();
+    const argText = call.getArguments().map((a) => a.getText()).join(",");
+    const hostInvolved = HOST_RE.test(receiver) || HOST_RE.test(argText);
+    const allowInvolved = ALLOW_RE.test(receiver) || ALLOW_RE.test(argText);
+    if (hostInvolved && allowInvolved) return true;
+    if (ALLOW_RE.test(receiver) && HOST_RE.test(argText)) return true;
+  }
+
+  for (const bin of scope.getDescendantsOfKind(SyntaxKind.BinaryExpression)) {
+    const op = bin.getOperatorToken().getText();
+    if (op !== "===" && op !== "!==" && op !== "==" && op !== "!=") continue;
+    const sides = [bin.getLeft().getText(), bin.getRight().getText()];
+    if (sides.some((s) => /hostname|\bhost\b/i.test(s))) return true;
+  }
+  return false;
+}
+
 function scanBody(
   body: Node,
   tainted: TaintMap,
@@ -69,14 +99,7 @@ function scanBody(
       if (hardcodedBase) continue;
     }
 
-    const blockText = allowlistScope.getText();
-    const hasAllowlist =
-      blockText.includes("allowedHosts") ||
-      blockText.includes("allowedUrls") ||
-      blockText.includes("ALLOWED_") ||
-      blockText.includes(".startsWith('https://") ||
-      (blockText.includes("new URL(") && blockText.includes(".hostname"));
-    if (hasAllowlist) continue;
+    if (hasHostValidation(allowlistScope)) continue;
 
     const lineNum = call.getStartLineNumber();
     const { column } = sourceFile.getLineAndColumnAtPos(call.getStart());

@@ -70,7 +70,7 @@ describe("resolveCallee", () => {
         name: "lib.ts",
         code: `
           export class Worker {
-            run(cmd: string) { return cmd; }
+            static run(cmd: string) { return cmd; }
           }
         `,
       },
@@ -78,7 +78,6 @@ describe("resolveCallee", () => {
         name: "server.ts",
         code: `
           import { Worker } from "./lib.js";
-          const w = new Worker();
           Worker.run("ls");
         `,
       },
@@ -88,6 +87,27 @@ describe("resolveCallee", () => {
     expect(r).toBeDefined();
     expect(r!.paramNames).toEqual(["cmd"]);
     expect(r!.fnName).toBe("Worker.run");
+  });
+
+  it("resolves a namespace-imported module function", () => {
+    const project = makeMultiFileProject([
+      {
+        name: "helpers.ts",
+        code: `export function run(cmd: string) { return cmd; }`,
+      },
+      {
+        name: "server.ts",
+        code: `
+          import * as helpers from "./helpers.js";
+          helpers.run("ls");
+        `,
+      },
+    ]);
+    const server = project.getSourceFileOrThrow("server.ts");
+    const r = resolveCallee(firstCallTo(server, "helpers.run"), server);
+    expect(r).toBeDefined();
+    expect(r!.paramNames).toEqual(["cmd"]);
+    expect(r!.file).toContain("helpers.ts");
   });
 
   it("returns undefined for library receivers like fs.readFile", () => {

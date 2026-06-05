@@ -148,8 +148,8 @@ describe("sql-injection rule", () => {
       });
     `);
     const findings = detectSqlInjection(sf);
-    expect(findings.length).toBeGreaterThanOrEqual(1);
-    expect(findings[0].rule).toBe("mcp-sql-injection");
+    expect(findings).toHaveLength(1);
+    findings.forEach((f) => expect(f.rule).toBe("mcp-sql-injection"));
   });
 
   it("flags query() on a receiver initialized via new Pool() (L10)", () => {
@@ -162,6 +162,7 @@ describe("sql-injection rule", () => {
       });
     `);
     const findings = detectSqlInjection(sf);
-    expect(findings.length).toBeGreaterThanOrEqual(1);
+    expect(findings).toHaveLength(1);
+    findings.forEach((f) => expect(f.rule).toBe("mcp-sql-injection"));
   });
 });
