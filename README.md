@@ -27,6 +27,19 @@ npx mcpeek scan ./my-server --ci --fail-on high
 npx mcpeek scan ./my-server --format sarif --output findings.sarif
 ```
 
+## Scan options
+
+| Flag | Description |
+|------|-------------|
+| `-f, --format <format>` | Output format: `markdown` (default), `json`, or `sarif` |
+| `-o, --output <file>` | Write output to a file instead of stdout |
+| `--rules <list>` | Comma-separated rules to run (default: all) |
+| `--registrations <names>` | Comma-separated custom tool-registration wrapper functions (e.g. `registerMyTool`) to treat like `server.tool()` |
+| `--taint-context` | Treat the handler's second (context) parameter as attacker-controlled |
+| `--include-tests` | Also scan example/test/demo files that are excluded by default |
+| `--ci` | Exit with code 1 if findings at or above `--fail-on` severity are present |
+| `--fail-on <severity>` | Minimum severity to trigger CI failure: `critical` / `high` / `medium` / `low` (default: `high`) |
+
 ## Detection rules
 
 | Rule | Severity | CWE | Description |
@@ -38,7 +51,7 @@ npx mcpeek scan ./my-server --format sarif --output findings.sarif
 | `mcp-ssrf` | High | CWE-918 | Tool handler param flows to `fetch` / `axios` / `got` without an allowlist |
 | `mcp-tool-poisoning` | High | CWE-74 | Tool name/description contains prompt-injection keywords, hidden Unicode, ANSI escapes, or violates MCP naming rules |
 | `mcp-missing-input-validation` | High | CWE-20 | Tool registered without a Zod schema |
-| `mcp-hardcoded-credential` | High | CWE-798 | API key / token / secret hardcoded in source |
+| `mcp-hardcoded-credential` | High | CWE-798 | API key / token / secret hardcoded in source or committed `.env` files |
 | `mcp-weak-input-validation` | Medium | CWE-20 | Schema uses `z.any()` / `z.unknown()` |
 | `mcp-weak-schema-bounds` | Medium | CWE-20 | Zod schema accepts user input without size, range, or pattern bounds |
 

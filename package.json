@@ -1,6 +1,6 @@
 {
   "name": "mcpeek",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Source-code-level security scanner for MCP (Model Context Protocol) server implementations",
   "type": "module",
   "bin": {
