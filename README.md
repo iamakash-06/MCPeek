@@ -63,6 +63,8 @@ npx mcpeek scan ./my-server --format sarif --output findings.sarif
 | `mcp-header-sensitive` | Medium | CWE-200 | `x-mcp-header` mirrors a secret-looking argument into an HTTP header |
 | `mcp-apps-html-xss` | High | CWE-79 | MCP Apps HTML resource built from unescaped tool input |
 
+Migration-readiness findings (`mcp-session-keyed-state` and `mcp-migration-*`) are scored separately as `migration.score`. Findings are weighted by confidence: high 100%, medium 80%, low 50%.
+
 Each finding includes a `taintChain` showing how user input reaches the sink — e.g. `cmd (handler param) → command (line 3) → execSync() (line 5)`.
 
 ## Batch audit
