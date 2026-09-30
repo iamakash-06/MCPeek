@@ -78,9 +78,7 @@ export async function analyzeTypeScript(
       !fp.includes("/build/") &&
       !fp.endsWith(".d.ts") &&
       !isVendoredFile(fp) &&
-      // L15: example/test files are skipped by default, but a shipped vulnerable
-      // example server can be a real risk — --include-tests opts them back in.
-      (options.includeTests || !isTestFile(fp))
+      (options.includeTests || fileKind(fp) !== "test")
     );
   };
 
@@ -102,7 +100,7 @@ export async function analyzeTypeScript(
       const fp = f.getFilePath();
       if (fp.includes("node_modules") || fp.includes("/dist/") || fp.includes("/build/") || fp.endsWith(".d.ts")) continue;
       if (isVendoredFile(fp)) skipped.vendored++;
-      else if (!options.includeTests && isTestFile(fp)) skipped.tests++;
+      else if (!options.includeTests && fileKind(fp) === "test") skipped.tests++;
     }
   };
 
@@ -144,9 +142,12 @@ export async function analyzeTypeScript(
     } catch {
       // Skip files that fail to parse
     }
+    const context = fileKind(sourceFile.getFilePath());
     for (const rule of activeRules) {
       try {
-        allFindings.push(...runRule(rule, sourceFile, handlerOptions));
+        const found = runRule(rule, sourceFile, handlerOptions);
+        if (context) for (const f of found) f.context = context;
+        allFindings.push(...found);
       } catch {
         // Skip files that fail to parse
       }
@@ -218,35 +219,16 @@ function runRule(
   }
 }
 
-function isTestFile(fp: string): boolean {
-  return (
-    // Unit / integration tests
-    fp.endsWith(".test.ts") ||
-    fp.endsWith(".test.js") ||
-    fp.endsWith(".spec.ts") ||
-    fp.endsWith(".spec.js") ||
-    fp.includes("/__tests__/") ||
-    fp.includes("/test/") ||
-    fp.includes("/tests/") ||
-    fp.includes("/fixtures/") ||
-    fp.includes("/mocks/") ||
-    fp.includes("/mock/") ||
-    fp.endsWith("mocks.ts") ||
-    fp.endsWith("mock.ts") ||
-    fp.endsWith("fixtures.ts") ||
-    // Documentation examples and guides — intentionally simplified code that
-    // does not follow production best-practices (e.g. missing Zod schemas)
-    fp.endsWith(".examples.ts") ||
-    fp.endsWith(".examples.js") ||
-    fp.includes("/examples/") ||
-    fp.includes("/example/") ||
-    fp.includes("/guides/") ||
-    fp.includes("/guide/") ||
-    fp.includes("/demo/") ||
-    fp.includes("/demos/") ||
-    fp.includes("/samples/") ||
-    fp.includes("/sample/")
-  );
+function fileKind(fp: string): "test" | "example" | undefined {
+  if (
+    /\.(test|spec)\.(ts|js)$/.test(fp) ||
+    /\/(__tests__|test|tests|fixtures|mocks?)\//.test(fp) ||
+    /(mocks?|fixtures)\.ts$/.test(fp)
+  ) {
+    return "test";
+  }
+  if (/\.examples\.(ts|js)$/.test(fp) || /\/(examples?|guides?|demos?|samples?)\//.test(fp)) return "example";
+  return undefined;
 }
 
 function findTsConfig(root: string): string | undefined {

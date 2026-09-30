@@ -36,7 +36,7 @@ npx mcpeek scan ./my-server --format sarif --output findings.sarif
 | `--rules <list>` | Comma-separated rules to run (default: all) |
 | `--registrations <names>` | Comma-separated custom tool-registration wrapper functions (e.g. `registerMyTool`) to treat like `server.tool()` |
 | `--taint-context` | Treat the handler's second (context) parameter as attacker-controlled |
-| `--include-tests` | Also scan example/test/demo files that are excluded by default |
+| `--include-tests` | Also scan test files, which are skipped by default. Example and test findings are tagged and do not affect the score or CI gate |
 | `--ci` | Exit with code 1 if findings at or above `--fail-on` severity are present |
 | `--fail-on <severity>` | Minimum severity to trigger CI failure: `critical` / `high` / `medium` / `low` (default: `high`) |
 

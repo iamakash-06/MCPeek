@@ -68,13 +68,14 @@ describe("scan coverage", () => {
     expect(findings.filter((f) => f.rule === "mcp-command-injection")).toHaveLength(1);
   });
 
-  it("counts skipped test and example files", async () => {
+  it("counts skipped test files and still analyzes examples", async () => {
     dir = mkdtempSync(join(tmpdir(), "mcpeek-cov-"));
     write("src/server.ts", SERVER);
     write("examples/demo.ts", SERVER);
     write("test/a.test.ts", SERVER);
     const { coverage } = await analyzeTypeScript(dir);
-    expect(coverage.skipped.tests).toBe(2);
+    expect(coverage.skipped.tests).toBe(1);
+    expect(coverage.filesAnalyzed).toBe(2);
   });
 
   it("marks an SDK import with no detected handlers as not assessed", async () => {
