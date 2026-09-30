@@ -50,12 +50,12 @@ function buildSummary(
   findings: Finding[]
 ): ScanResult["summary"] {
   const s = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  for (const f of findings) s[f.severity]++;
+  for (const f of findings) if (!f.context) s[f.severity]++;
   return s;
 }
 
 function calculateScore(findings: Finding[]): number {
-  const deduction = findings.reduce(
+  const deduction = findings.filter((f) => !f.context).reduce(
     (acc, f) => acc + (SEVERITY_WEIGHT[f.severity] ?? 0),
     0
   );
@@ -69,6 +69,6 @@ export function hasCriticalOrHighFindings(
   const order: Severity[] = ["critical", "high", "medium", "low", "info"];
   const thresholdIdx = order.indexOf(threshold);
   return result.findings.some(
-    (f) => order.indexOf(f.severity) <= thresholdIdx
+    (f) => !f.context && order.indexOf(f.severity) <= thresholdIdx
   );
 }

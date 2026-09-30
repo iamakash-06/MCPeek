@@ -47,7 +47,7 @@ export function toMarkdown(result: ScanResult): string {
     lines.push(`### ${SEVERITY_ICON[sev]} ${capitalize(sev)} (${group.length})\n`);
 
     for (const f of group) {
-      lines.push(`#### ${f.rule} — ${f.cwe}`);
+      lines.push(`#### ${f.rule} — ${f.cwe}${f.context ? ` (${f.context})` : ""}`);
       lines.push(`**File:** \`${relativePath(f.file, target)}\` line ${f.line}`);
       lines.push(`**Confidence:** ${f.confidence}`);
       lines.push(`\n${f.message}\n`);
