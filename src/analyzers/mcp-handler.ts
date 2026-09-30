@@ -6,6 +6,7 @@
  *   server.tool(name, schema, handler)   — with Zod schema
  *   server.setRequestHandler(...)        — low-level SDK API
  *   server.addTool(...)                  — community wrapper libraries
+ *   server.registerTool(name, config, handler) — v2 SDK
  */
 
 import {
@@ -16,7 +17,9 @@ import {
   FunctionExpression,
   FunctionDeclaration,
   BindingElement,
+  CallExpression,
 } from "ts-morph";
+import { resolveSchemaDefinition } from "./cross-file.js";
 
 export interface MCPToolHandler {
   paramNames: string[];
@@ -63,11 +66,24 @@ function resolveHandlerFunction(node: Node): HandlerFn | undefined {
   return undefined;
 }
 
+export function getRegisterToolInputSchema(call: CallExpression): Node | undefined {
+  const config = call.getArguments()[1];
+  if (!config) return undefined;
+  const obj = resolveSchemaDefinition(config).asKind(SyntaxKind.ObjectLiteralExpression);
+  if (!obj) return undefined;
+  const prop = obj.getProperty("inputSchema");
+  if (!prop) return undefined;
+  if (Node.isPropertyAssignment(prop)) return prop.getInitializer();
+  if (Node.isShorthandPropertyAssignment(prop)) return prop.getNameNode();
+  return undefined;
+}
+
 function isMCPRegistration(text: string, extraRegistrations: string[]): boolean {
   if (
     text.endsWith(".tool") ||
     text.endsWith(".setRequestHandler") ||
     text.endsWith(".addTool") ||
+    text.endsWith(".registerTool") ||
     text === "server.tool" ||
     text === "server.setRequestHandler"
   ) {
@@ -104,7 +120,12 @@ export function findMCPToolHandlers(
     // MCP handlers receive a single destructured input object as their first param.
     // Slice to 1 to avoid treating the SDK context object as user-controlled input,
     // unless taintContextParam opts in to modeling the second param too (L6).
-    const params = handlerFn.getParameters();
+    // v2 registerTool without inputSchema calls the handler with (extra) only.
+    const noInput =
+      text.endsWith(".registerTool") &&
+      resolveSchemaDefinition(args[1]).isKind(SyntaxKind.ObjectLiteralExpression) &&
+      !getRegisterToolInputSchema(call);
+    const params = noInput ? [] : handlerFn.getParameters();
     const paramNames: string[] = [];
     const paramLimit = options.taintContextParam ? 2 : 1;
 

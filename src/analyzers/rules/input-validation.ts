@@ -2,6 +2,7 @@ import { SourceFile, SyntaxKind } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { extractSnippet } from "../snippet.js";
 import { resolveSchemaDefinition } from "../cross-file.js";
+import { getRegisterToolInputSchema } from "../mcp-handler.js";
 
 export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] {
   const findings: Finding[] = [];
@@ -16,6 +17,7 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
     const isMCPRegistration =
       text.endsWith(".tool") ||
       text.endsWith(".addTool") ||
+      text.endsWith(".registerTool") ||
       text.endsWith(".setRequestHandler") ||
       text === "server.tool";
 
@@ -32,8 +34,10 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
       args[0].getKind() === SyntaxKind.StringLiteral
     ) continue;
 
+    const isRegisterTool = text.endsWith(".registerTool");
+
     // server.tool(name, handler) — missing schema entirely
-    if (args.length === 2) {
+    if (args.length === 2 && !isRegisterTool) {
       const secondArg = args[1];
       const isHandler =
         secondArg.getKind() === SyntaxKind.ArrowFunction ||
@@ -61,7 +65,8 @@ export function detectMissingInputValidation(sourceFile: SourceFile): Finding[] 
 
     // server.tool(name, schema, handler) — check if schema uses raw z.any() or z.unknown()
     if (args.length >= 3) {
-      const schemaArg = args[1];
+      const schemaArg = isRegisterTool ? getRegisterToolInputSchema(call) : args[1];
+      if (!schemaArg) continue;
       const resolvedSchema = resolveSchemaDefinition(schemaArg);
       const schemaText = resolvedSchema.getText();
 
