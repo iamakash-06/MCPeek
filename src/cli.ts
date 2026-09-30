@@ -47,6 +47,8 @@ program
       includeTests: opts.includeTests,
     });
 
+    for (const w of result.warnings ?? []) console.error(`[mcpeek] warning: ${w}`);
+
     const format = opts.format as OutputFormat;
     const output = formatResult(result, format);
 
@@ -97,6 +99,7 @@ program
         console.error(
           `  ✓ score=${scanResult.score} findings=${scanResult.findings.length}`
         );
+        for (const w of scanResult.warnings ?? []) console.error(`  ⚠ ${w}`);
       } catch (err) {
         console.error(`  ✗ Failed: ${(err as Error).message}`);
         failedTargets.push(target.name);

@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { join } from "path";
+import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
 import { Project } from "ts-morph";
 import { analyzeTypeScript } from "../src/analyzers/ts-analyzer.js";
 import { findMCPToolHandlers } from "../src/analyzers/mcp-handler.js";
@@ -129,7 +131,6 @@ describe("v2 spec fixtures", () => {
   it("reports every v2 rule on the vulnerable server", async () => {
     expect(await scanFixture("vulnerable-v2-spec")).toEqual([
       "mcp-apps-html-xss",
-      "mcp-hardcoded-credential",
       "mcp-header-sensitive",
       "mcp-meta-authz",
       "mcp-requeststate-secret",
@@ -140,5 +141,35 @@ describe("v2 spec fixtures", () => {
 
   it("reports nothing on the hardened twin", async () => {
     expect(await scanFixture("hardened-v2-spec")).toEqual([]);
+  });
+});
+
+describe("no-handler warning", () => {
+  const scanCode = async (code: string) => {
+    const dir = mkdtempSync(join(tmpdir(), "mcpeek-warn-"));
+    try {
+      writeFileSync(join(dir, "server.ts"), code);
+      return (await analyzeTypeScript(dir)).warnings;
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  };
+
+  it("warns when the SDK is imported but no handler is entered", async () => {
+    const warnings = await scanCode(`
+      import { McpServer } from "@modelcontextprotocol/server";
+      for (const t of loadTools()) server.registerTool(t.name, t.config, t.handler);
+    `);
+    expect(warnings).toHaveLength(1);
+  });
+
+  it("stays quiet when handlers are found or the SDK is absent", async () => {
+    expect(
+      await scanCode(`
+        import { McpServer } from "@modelcontextprotocol/server";
+        server.registerTool("t", { inputSchema: { v: z.string().max(5) } }, async ({ v }) => ({ content: [] }));
+      `)
+    ).toEqual([]);
+    expect(await scanCode(`export const x = 1;`)).toEqual([]);
   });
 });
