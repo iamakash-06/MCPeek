@@ -58,6 +58,7 @@ npx mcpeek scan ./my-server --format sarif --output findings.sarif
 | `mcp-requeststate-weak-key` | High / Medium | CWE-321 / CWE-320 | requestState codec key hardcoded, or generated per process |
 | `mcp-requeststate-secret` | High | CWE-312 | Secret-looking data passed to `codec.mint()` (signed, not encrypted) |
 | `mcp-meta-authz` | Medium | CWE-807 | `_meta` or request headers used in an authorization or identity decision |
+| `mcp-header-trust` | Medium | CWE-807 | `Mcp-Method` / `Mcp-Name` header drives a decision without a body cross-check |
 | `mcp-header-sensitive` | Medium | CWE-200 | `x-mcp-header` mirrors a secret-looking argument into an HTTP header |
 | `mcp-apps-html-xss` | High | CWE-79 | MCP Apps HTML resource built from unescaped tool input |
 

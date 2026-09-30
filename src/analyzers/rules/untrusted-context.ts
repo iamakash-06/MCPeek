@@ -3,6 +3,8 @@ import type { Finding } from "../../types.js";
 import { extractSnippet } from "../snippet.js";
 
 const AUTH_KEY_RE = /user|tenant|role|admin|scope|permission|principal|identity|owner|org|account|email|trusted|internal|privileg/i;
+const ROUTING_HEADER_RE = /^mcp-(method|name)$/i;
+const BODY_CROSSCHECK_RE = /params\??\.name|(body|message|request|rpc|payload)\??\.method/;
 const IGNORED_HEADERS = /^(user-agent|authorization|proxy-authorization)$/i;
 
 const isRequestHeaders = (recv: string) => /(^|\.)headers$/.test(recv) && !/\b(res|response)\b/i.test(recv);
@@ -24,6 +26,9 @@ function accessedKey(node: Node): { key: string; source: "_meta" | "header" } | 
     const pa = node.getExpression().asKind(SyntaxKind.PropertyAccessExpression);
     const arg = node.getArguments()[0];
     if (pa?.getName() === "get" && isRequestHeaders(pa.getExpression().getText()) && arg && Node.isStringLiteral(arg)) {
+      return { key: arg.getLiteralText(), source: "header" };
+    }
+    if ((pa?.getName() === "header" || pa?.getName() === "getHeader") && arg && Node.isStringLiteral(arg) && !/\b(res|response)\b/i.test(pa.getExpression().getText())) {
       return { key: arg.getLiteralText(), source: "header" };
     }
   }
@@ -49,7 +54,8 @@ function decisionContext(node: Node): "condition" | "assignment" | undefined {
 
 export function detectUntrustedContextAuthz(sourceFile: SourceFile): Finding[] {
   const text = sourceFile.getFullText();
-  if (!text.includes("@modelcontextprotocol/") || !/_meta|headers/.test(text)) return [];
+  const hasRoutingHeader = /mcp-(method|name)/i.test(text);
+  if ((!text.includes("@modelcontextprotocol/") || !/_meta|headers/.test(text)) && !hasRoutingHeader) return [];
   const findings: Finding[] = [];
   const seen = new Set<number>();
 
@@ -60,12 +66,32 @@ export function detectUntrustedContextAuthz(sourceFile: SourceFile): Finding[] {
   ];
   for (const node of candidates) {
     const hit = accessedKey(node);
-    if (!hit || !AUTH_KEY_RE.test(hit.key) || IGNORED_HEADERS.test(hit.key)) continue;
+    if (!hit) continue;
+    const routing = hit.source === "header" && ROUTING_HEADER_RE.test(hit.key);
+    if (!routing && (!AUTH_KEY_RE.test(hit.key) || IGNORED_HEADERS.test(hit.key))) continue;
     const context = decisionContext(node);
     if (!context) continue;
     const line = node.getStartLineNumber();
     if (seen.has(line)) continue;
     seen.add(line);
+
+    if (routing) {
+      const fn = node.getFirstAncestor((a) => Node.isFunctionLikeDeclaration(a));
+      if (BODY_CROSSCHECK_RE.test((fn ?? sourceFile).getText())) continue;
+      findings.push({
+        rule: "mcp-header-trust",
+        severity: "medium",
+        cwe: "CWE-807",
+        file: sourceFile.getFilePath(),
+        line,
+        column: sourceFile.getLineAndColumnAtPos(node.getStart()).column,
+        message: `Header "${hit.key}" drives a decision without being checked against the JSON-RPC body, so a client can send a header that disagrees with the request`,
+        evidence: extractSnippet(sourceFile, line, 3),
+        remediation: "Treat Mcp-Method and Mcp-Name as routing hints only and reject requests whose body method or params.name differ.",
+        confidence: "medium",
+      });
+      continue;
+    }
 
     findings.push({
       rule: "mcp-meta-authz",
