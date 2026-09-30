@@ -16,6 +16,7 @@ import { detectCodeInjection } from "./rules/code-injection.js";
 import { detectRequestState } from "./rules/request-state.js";
 import { detectSensitiveHeaderMapping } from "./rules/header-sensitive.js";
 import { detectUntrustedContextAuthz } from "./rules/untrusted-context.js";
+import { detectRequestStateAuthzGap } from "./rules/requeststate-authz.js";
 import { detectAppsHtmlXss } from "./rules/apps-xss.js";
 
 export type RuleName =
@@ -31,7 +32,8 @@ export type RuleName =
   | "request-state"
   | "header-sensitive"
   | "meta-authz"
-  | "apps-xss";
+  | "apps-xss"
+  | "requeststate-authz";
 
 export const ALL_RULES: RuleName[] = [
   "command-injection",
@@ -47,6 +49,7 @@ export const ALL_RULES: RuleName[] = [
   "header-sensitive",
   "meta-authz",
   "apps-xss",
+  "requeststate-authz",
 ];
 
 export interface AnalyzeResult {
@@ -203,6 +206,8 @@ function runRule(
       return detectSensitiveHeaderMapping(sourceFile);
     case "meta-authz":
       return detectUntrustedContextAuthz(sourceFile);
+    case "requeststate-authz":
+      return detectRequestStateAuthzGap(sourceFile, handlerOptions);
     case "apps-xss":
       return detectAppsHtmlXss(sourceFile, handlerOptions);
   }
