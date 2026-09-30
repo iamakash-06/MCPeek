@@ -15,6 +15,7 @@ import { SourceFile, SyntaxKind, Node } from "ts-morph";
 import type { Finding } from "../../types.js";
 import { extractSnippet } from "../snippet.js";
 import { resolveSchemaDefinition } from "../cross-file.js";
+import { getRegisterToolInputSchema } from "../mcp-handler.js";
 
 const STRING_BOUND_METHODS = new Set([
   "min", "max", "length",
@@ -52,13 +53,17 @@ export function detectWeakSchemaBounds(sourceFile: SourceFile): Finding[] {
     const isMCPRegistration =
       text.endsWith(".tool") ||
       text.endsWith(".addTool") ||
+      text.endsWith(".registerTool") ||
       text === "server.tool";
     if (!isMCPRegistration) continue;
 
     const args = call.getArguments();
     if (args.length < 3) continue;
 
-    const schemaArg = args[1];
+    const schemaArg = text.endsWith(".registerTool")
+      ? getRegisterToolInputSchema(call)
+      : args[1];
+    if (!schemaArg) continue;
     const weakFields = findWeakFields(schemaArg);
     if (weakFields.length === 0) continue;
 
