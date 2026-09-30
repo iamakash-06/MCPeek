@@ -2,7 +2,7 @@ import { Project } from "ts-morph";
 import { existsSync } from "fs";
 import { join } from "path";
 import type { Coverage, Finding, ScanOptions } from "../types.js";
-import { countUnsupportedSources, coverageWarnings, isVendoredFile } from "./coverage.js";
+import { countUnsupportedSources, coverageWarnings, fileKind, isVendoredFile } from "./coverage.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "./mcp-handler.js";
 import { detectCommandInjection } from "./rules/command-injection.js";
 import { detectMissingInputValidation } from "./rules/input-validation.js";
@@ -18,6 +18,9 @@ import { detectSensitiveHeaderMapping } from "./rules/header-sensitive.js";
 import { detectUntrustedContextAuthz } from "./rules/untrusted-context.js";
 import { detectRequestStateAuthzGap } from "./rules/requeststate-authz.js";
 import { detectSessionKeyedState } from "./rules/session-state.js";
+import { detectMigrationReadiness } from "./rules/migration.js";
+import { detectAppsWildcardCsp } from "./rules/apps-csp.js";
+import { detectSignedTokenSecrets } from "./rules/signed-token.js";
 import { detectAppsHtmlXss } from "./rules/apps-xss.js";
 
 export type RuleName =
@@ -35,7 +38,10 @@ export type RuleName =
   | "meta-authz"
   | "apps-xss"
   | "requeststate-authz"
-  | "session-state";
+  | "session-state"
+  | "migration"
+  | "apps-csp"
+  | "signed-token";
 
 export const ALL_RULES: RuleName[] = [
   "command-injection",
@@ -53,6 +59,9 @@ export const ALL_RULES: RuleName[] = [
   "apps-xss",
   "requeststate-authz",
   "session-state",
+  "migration",
+  "apps-csp",
+  "signed-token",
 ];
 
 export interface AnalyzeResult {
@@ -214,21 +223,15 @@ function runRule(
       return detectRequestStateAuthzGap(sourceFile, handlerOptions);
     case "session-state":
       return detectSessionKeyedState(sourceFile);
+    case "migration":
+      return detectMigrationReadiness(sourceFile);
+    case "apps-csp":
+      return detectAppsWildcardCsp(sourceFile);
+    case "signed-token":
+      return detectSignedTokenSecrets(sourceFile);
     case "apps-xss":
       return detectAppsHtmlXss(sourceFile, handlerOptions);
   }
-}
-
-function fileKind(fp: string): "test" | "example" | undefined {
-  if (
-    /\.(test|spec)\.(ts|js)$/.test(fp) ||
-    /\/(__tests__|test|tests|fixtures|mocks?)\//.test(fp) ||
-    /(mocks?|fixtures)\.ts$/.test(fp)
-  ) {
-    return "test";
-  }
-  if (/\.examples\.(ts|js)$/.test(fp) || /\/(examples?|guides?|demos?|samples?)\//.test(fp)) return "example";
-  return undefined;
 }
 
 function findTsConfig(root: string): string | undefined {

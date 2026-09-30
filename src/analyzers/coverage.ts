@@ -11,7 +11,7 @@ const OTHER_LANGUAGES: Record<string, string> = {
   ".rs": "Rust",
 };
 
-const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "vendor", "target", "venv", ".venv", "__pycache__"]);
+export const SKIP_DIRS = new Set(["node_modules", ".git", "dist", "build", "vendor", "target", "venv", ".venv", "__pycache__"]);
 
 const VENDORED_RE = /(^|\/)(vendor|vendored|third[_-]party|generated|__generated__)\//;
 const GENERATED_FILE_RE = /(\.generated|\.gen|spec\.types)\.(ts|js)$/;
@@ -52,4 +52,16 @@ export function coverageWarnings(c: Coverage): string[] {
     );
   }
   return warnings;
+}
+
+export function fileKind(fp: string): "test" | "example" | undefined {
+  if (
+    /\.(test|spec)\.(ts|js)$/.test(fp) ||
+    /\/(__tests__|test|tests|fixtures|mocks?)\//.test(fp) ||
+    /(mocks?|fixtures)\.ts$/.test(fp)
+  ) {
+    return "test";
+  }
+  if (/\.examples\.(ts|js)$/.test(fp) || /\/(examples?|guides?|demos?|samples?)\//.test(fp)) return "example";
+  return undefined;
 }
