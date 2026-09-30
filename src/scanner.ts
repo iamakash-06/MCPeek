@@ -1,6 +1,7 @@
 import type { ScanResult, ScanOptions, Finding, Severity, Summary } from "./types.js";
 import { analyzeTypeScript } from "./analyzers/ts-analyzer.js";
 import { scanEnvFiles } from "./analyzers/env-scanner.js";
+import { scanManifests } from "./analyzers/manifest-scanner.js";
 import { fetchRepo } from "./repo-fetcher.js";
 
 const SEVERITY_WEIGHT: Record<Severity, number> = {
@@ -34,7 +35,7 @@ export async function scan(
 
     // Dotenv scanning is independent of the TS Program — a committed .env can
     // leak secrets even in a repo with zero TypeScript files (filesScanned: 0).
-    const findings = [...codeFindings, ...scanEnvFiles(path)];
+    const findings = [...codeFindings, ...scanEnvFiles(path), ...(!options.rules || options.rules.includes("migration") ? scanManifests(path, options) : [])];
 
     const scored = findings.filter((f) => !f.context);
     const security = scored.filter((f) => !isMigrationFinding(f));

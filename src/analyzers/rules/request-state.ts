@@ -56,7 +56,7 @@ function isCodecReceiver(receiver: Node): boolean {
   return init !== receiver && init.getText().startsWith("createRequestStateCodec");
 }
 
-function secretPayloadFields(payload: Node): string[] {
+export function secretPayloadFields(payload: Node, includeEnvReads = true): string[] {
   const obj = resolveSchemaDefinition(payload).asKind(SyntaxKind.ObjectLiteralExpression);
   if (!obj) return [];
   const hits: string[] = [];
@@ -64,7 +64,7 @@ function secretPayloadFields(payload: Node): string[] {
     const name = Node.isPropertyAssignment(prop) || Node.isShorthandPropertyAssignment(prop) ? prop.getName() : "";
     const value = Node.isPropertyAssignment(prop) ? prop.getInitializer() : prop;
     const idents = value?.getDescendantsOfKind(SyntaxKind.Identifier).map((i) => i.getText()) ?? [];
-    const envRead = /process\.env|import\.meta\.env/.test(value?.getText() ?? "");
+    const envRead = includeEnvReads && /process\.env|import\.meta\.env/.test(value?.getText() ?? "");
     if (SECRET_NAME_RE.test(name) || idents.some((i) => SECRET_NAME_RE.test(i)) || envRead) hits.push(name);
   }
   return hits;

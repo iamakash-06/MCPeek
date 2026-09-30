@@ -62,6 +62,12 @@ npx mcpeek scan ./my-server --format sarif --output findings.sarif
 | `mcp-session-keyed-state` | Medium / Low | CWE-362 | In-process map keyed by session id, or a transport `sessionIdGenerator` |
 | `mcp-header-sensitive` | Medium | CWE-200 | `x-mcp-header` mirrors a secret-looking argument into an HTTP header |
 | `mcp-apps-html-xss` | High | CWE-79 | MCP Apps HTML resource built from unescaped tool input |
+| `mcp-apps-wildcard-csp` | Medium | CWE-693 | MCP Apps CSP allows `*` or a bare scheme in a `*Domains` list |
+| `mcp-signed-token-secret` | High | CWE-312 | Secret-looking data placed in a signed JWT payload |
+| `mcp-migration-push-request` | Low | CWE-477 | `elicitInput`, `createMessage` or `listRoots` pushes a server-initiated request |
+| `mcp-migration-removed-method` | Low | CWE-477 | Use of `ping`, `logging/setLevel` or `notifications/roots/list_changed` |
+| `mcp-migration-legacy-sdk` | Info | CWE-1104 | `package.json` depends on the v1 `@modelcontextprotocol/sdk` package |
+| `mcp-migration-unbounded-sdk-range` | Low | CWE-1104 | `@modelcontextprotocol/*` dependency with a `*`, `latest` or `>=` range |
 
 Migration-readiness findings (`mcp-session-keyed-state` and `mcp-migration-*`) are scored separately as `migration.score`. Findings are weighted by confidence: high 100%, medium 80%, low 50%.
 
