@@ -143,7 +143,11 @@ function formatResult(
 }
 
 function printSummary(result: ReturnType<typeof scan> extends Promise<infer R> ? R : never): void {
-  const { score, summary, findings } = result as Awaited<ReturnType<typeof scan>>;
+  const { score, summary, findings, coverage } = result as Awaited<ReturnType<typeof scan>>;
+  if (!coverage.assessed) {
+    console.error("\nNot assessed: the scanner could not analyze this target, so the score is not meaningful.");
+    return;
+  }
   console.error(
     `\nScore: ${score}/100 | Critical: ${summary.critical} | High: ${summary.high} | Medium: ${summary.medium} | Low: ${summary.low}`
   );
@@ -153,7 +157,7 @@ function printSummary(result: ReturnType<typeof scan> extends Promise<infer R> ?
 }
 
 function printAuditSummary(results: AuditResult[]): void {
-  const scannable = results.filter((r) => r.scan.language !== "unknown");
+  const scannable = results.filter((r) => r.scan.coverage.assessed);
   const total = scannable.reduce((s, r) => s + r.scan.findings.length, 0);
   const critical = scannable.reduce((s, r) => s + r.scan.summary.critical, 0);
   const high = scannable.reduce((s, r) => s + r.scan.summary.high, 0);
@@ -162,6 +166,6 @@ function printAuditSummary(results: AuditResult[]): void {
     : 0;
   const skipped = results.length - scannable.length;
   console.error(
-    `Servers: ${scannable.length}${skipped > 0 ? ` (${skipped} skipped — no TS files)` : ""} | Total findings: ${total} | Critical: ${critical} | High: ${high} | Avg score: ${avgScore}/100`
+    `Servers: ${scannable.length}${skipped > 0 ? ` (${skipped} not assessed)` : ""} | Total findings: ${total} | Critical: ${critical} | High: ${high} | Avg score: ${avgScore}/100`
   );
 }

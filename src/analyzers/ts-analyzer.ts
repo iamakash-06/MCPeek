@@ -1,7 +1,8 @@
 import { Project } from "ts-morph";
 import { existsSync } from "fs";
 import { join } from "path";
-import type { Finding, ScanOptions } from "../types.js";
+import type { Coverage, Finding, ScanOptions } from "../types.js";
+import { countUnsupportedSources, coverageWarnings, isVendoredFile } from "./coverage.js";
 import { findMCPToolHandlers, type HandlerScanOptions } from "./mcp-handler.js";
 import { detectCommandInjection } from "./rules/command-injection.js";
 import { detectMissingInputValidation } from "./rules/input-validation.js";
@@ -52,6 +53,7 @@ export interface AnalyzeResult {
   findings: Finding[];
   filesScanned: number;
   warnings: string[];
+  coverage: Coverage;
 }
 
 const SDK_IMPORT_RE = /from\s+["']@modelcontextprotocol\/(sdk|server)/;
@@ -69,6 +71,7 @@ export async function analyzeTypeScript(
       !fp.includes("/dist/") &&
       !fp.includes("/build/") &&
       !fp.endsWith(".d.ts") &&
+      !isVendoredFile(fp) &&
       // L15: example/test files are skipped by default, but a shipped vulnerable
       // example server can be a real risk — --include-tests opts them back in.
       (options.includeTests || !isTestFile(fp))
@@ -87,7 +90,18 @@ export async function analyzeTypeScript(
     ]);
   }
 
+  const skipped = { tests: 0, vendored: 0 };
+  const countSkipped = (files: ReturnType<Project["getSourceFiles"]>) => {
+    for (const f of files) {
+      const fp = f.getFilePath();
+      if (fp.includes("node_modules") || fp.includes("/dist/") || fp.includes("/build/") || fp.endsWith(".d.ts")) continue;
+      if (isVendoredFile(fp)) skipped.vendored++;
+      else if (!options.includeTests && isTestFile(fp)) skipped.tests++;
+    }
+  };
+
   let sourceFiles = project.getSourceFiles().filter(fileFilter);
+  countSkipped(project.getSourceFiles());
 
   // Project-references pattern: root tsconfig has `"files":[]` + `"references":[...]`.
   // ts-morph reads the root config, sees an empty file list, and adds nothing —
@@ -100,6 +114,8 @@ export async function analyzeTypeScript(
       join(projectRoot, "**/*.js"),
     ]);
     sourceFiles = fallback.getSourceFiles().filter(fileFilter);
+    skipped.tests = skipped.vendored = 0;
+    countSkipped(fallback.getSourceFiles());
   }
 
   const activeRules: RuleName[] = options.rules
@@ -131,17 +147,29 @@ export async function analyzeTypeScript(
     }
   }
 
-  const warnings =
-    importsSdk && handlersEntered === 0
+  const blind = importsSdk && handlersEntered === 0;
+  const coverage: Coverage = {
+    assessed: sourceFiles.length > 0 && !blind,
+    filesAnalyzed: sourceFiles.length,
+    skipped,
+    unsupported: countUnsupportedSources(projectRoot),
+    handlers: handlersEntered,
+  };
+
+  const warnings = [
+    ...(blind
       ? [
           "MCP SDK imported but no tool handlers were detected; taint rules did not run. Tools may be registered through a wrapper, so try --registrations <name>.",
         ]
-      : [];
+      : []),
+    ...coverageWarnings(coverage),
+  ];
 
   return {
     findings: deduplicateFindings(allFindings),
     filesScanned: sourceFiles.length,
     warnings,
+    coverage,
   };
 }
 

@@ -9,14 +9,18 @@ const SEVERITY_ICON: Record<Severity, string> = {
 };
 
 export function toMarkdown(result: ScanResult): string {
-  const { target, scannedAt, filesScanned, score, summary, findings } = result;
+  const { target, scannedAt, filesScanned, score, summary, findings, coverage } = result;
   const lines: string[] = [];
 
   lines.push(`# MCPeek Security Report`);
   lines.push(`\n**Target:** \`${target}\``);
   lines.push(`**Scanned:** ${new Date(scannedAt).toUTCString()}`);
   lines.push(`**Files scanned:** ${filesScanned}`);
-  lines.push(`**Security score:** ${score}/100\n`);
+  lines.push(coverage.assessed ? `**Security score:** ${score}/100` : `**Security score:** not assessed`);
+  lines.push(`**Coverage:** ${coverage.handlers} handlers in ${coverage.filesAnalyzed} files; skipped ${coverage.skipped.tests} test/example, ${coverage.skipped.vendored} vendored`);
+  const unsupported = Object.entries(coverage.unsupported);
+  if (unsupported.length > 0) lines.push(`**Not analyzed:** ${unsupported.map(([l, n]) => `${l} (${n})`).join(", ")}`);
+  lines.push("");
 
   lines.push(`## Summary\n`);
   lines.push(`| Severity | Count |`);
@@ -29,7 +33,7 @@ export function toMarkdown(result: ScanResult): string {
   }
 
   if (findings.length === 0) {
-    lines.push(`\n## Findings\n\nNo issues found. ✅`);
+    lines.push(coverage.assessed ? `\n## Findings\n\nNo issues found. ✅` : `\n## Findings\n\nNo findings, but this target was not assessed.`);
     return lines.join("\n");
   }
 
