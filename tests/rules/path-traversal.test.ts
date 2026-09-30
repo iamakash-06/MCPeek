@@ -147,6 +147,27 @@ describe("path-traversal rule", () => {
     expect(detectPathTraversal(sf).length).toBeGreaterThanOrEqual(1);
   });
 
+  it("accepts realpath followed by a containment check", () => {
+    const sf = makeProject(`
+      server.registerResource("doc", tpl, {}, async (uri, { file }) => {
+        const requested = await realpath(path.join(ROOT, String(file)));
+        if (!requested.startsWith(ROOT + path.sep)) throw new Error("outside");
+        return { contents: [{ text: await readFile(requested, "utf8") }] };
+      });
+    `);
+    expect(detectPathTraversal(sf)).toHaveLength(0);
+  });
+
+  it("flags realpath without a containment check", () => {
+    const sf = makeProject(`
+      server.registerResource("doc", tpl, {}, async (uri, { file }) => {
+        const requested = await realpath(path.join(ROOT, String(file)));
+        return { contents: [{ text: await readFile(requested, "utf8") }] };
+      });
+    `);
+    expect(detectPathTraversal(sf).length).toBeGreaterThanOrEqual(1);
+  });
+
   it("detects taint through a bracketed element-access assignment", () => {
     const sf = makeProject(`
       server.tool("read", { path: z.string() }, async ({ path }) => {

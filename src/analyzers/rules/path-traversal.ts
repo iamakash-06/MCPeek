@@ -34,6 +34,7 @@ const FS_SINKS = new Set([
 ]);
 
 const PATH_HELPERS = new Set(["path.resolve", "path.normalize", "resolve", "normalize"]);
+const REALPATH_HELPERS = new Set(["realpath", "realpathSync", "fs.realpath", "fs.realpathSync", "fs.promises.realpath", "fsp.realpath"]);
 
 function isContainedPathCall(pathArg: Node, handlerBody: Node): boolean {
   let target: Node = pathArg;
@@ -57,11 +58,13 @@ function isContainedPathCall(pathArg: Node, handlerBody: Node): boolean {
     }
   }
 
-  const call = target.asKind(SyntaxKind.CallExpression);
+  const unwrapped = target.asKind(SyntaxKind.AwaitExpression)?.getExpression() ?? target;
+  const call = unwrapped.asKind(SyntaxKind.CallExpression);
   if (!call) return false;
   const callee = call.getExpression().getText();
-  if (!PATH_HELPERS.has(callee)) return false;
-  if (call.getArguments().length < 2) return false;
+  const isRealpath = REALPATH_HELPERS.has(callee);
+  if (!isRealpath && !PATH_HELPERS.has(callee)) return false;
+  if (!isRealpath && call.getArguments().length < 2) return false;
   resolvedTexts.add(call.getText().trim());
 
   return hasContainmentGuard(handlerBody, resolvedTexts);
