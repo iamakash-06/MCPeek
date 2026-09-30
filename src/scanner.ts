@@ -1,4 +1,4 @@
-import type { ScanResult, ScanOptions, Finding, Severity } from "./types.js";
+import type { ScanResult, ScanOptions, Finding, Severity, Summary } from "./types.js";
 import { analyzeTypeScript } from "./analyzers/ts-analyzer.js";
 import { scanEnvFiles } from "./analyzers/env-scanner.js";
 import { fetchRepo } from "./repo-fetcher.js";
@@ -10,6 +10,18 @@ const SEVERITY_WEIGHT: Record<Severity, number> = {
   low: 2,
   info: 0,
 };
+
+const CONFIDENCE_WEIGHT: Record<Finding["confidence"], number> = {
+  high: 1,
+  medium: 0.8,
+  low: 0.5,
+};
+
+const MIGRATION_RULES = new Set(["mcp-session-keyed-state"]);
+
+export function isMigrationFinding(f: Finding): boolean {
+  return f.rule.startsWith("mcp-migration-") || MIGRATION_RULES.has(f.rule);
+}
 
 export async function scan(
   target: string,
@@ -24,8 +36,9 @@ export async function scan(
     // leak secrets even in a repo with zero TypeScript files (filesScanned: 0).
     const findings = [...codeFindings, ...scanEnvFiles(path)];
 
-    const summary = buildSummary(findings);
-    const score = calculateScore(findings);
+    const scored = findings.filter((f) => !f.context);
+    const security = scored.filter((f) => !isMigrationFinding(f));
+    const migration = scored.filter(isMigrationFinding);
 
     return {
       target,
@@ -38,28 +51,27 @@ export async function scan(
       findings,
       warnings,
       coverage,
-      score,
-      summary,
+      score: calculateScore(security),
+      summary: buildSummary(security),
+      migration: { score: calculateScore(migration), summary: buildSummary(migration) },
     };
   } finally {
     cleanup();
   }
 }
 
-function buildSummary(
-  findings: Finding[]
-): ScanResult["summary"] {
+function buildSummary(findings: Finding[]): Summary {
   const s = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
-  for (const f of findings) if (!f.context) s[f.severity]++;
+  for (const f of findings) s[f.severity]++;
   return s;
 }
 
 function calculateScore(findings: Finding[]): number {
-  const deduction = findings.filter((f) => !f.context).reduce(
-    (acc, f) => acc + (SEVERITY_WEIGHT[f.severity] ?? 0),
+  const deduction = findings.reduce(
+    (acc, f) => acc + (SEVERITY_WEIGHT[f.severity] ?? 0) * CONFIDENCE_WEIGHT[f.confidence],
     0
   );
-  return Math.max(0, 100 - deduction);
+  return Math.max(0, Math.round(100 - deduction));
 }
 
 export function hasCriticalOrHighFindings(
@@ -69,6 +81,6 @@ export function hasCriticalOrHighFindings(
   const order: Severity[] = ["critical", "high", "medium", "low", "info"];
   const thresholdIdx = order.indexOf(threshold);
   return result.findings.some(
-    (f) => !f.context && order.indexOf(f.severity) <= thresholdIdx
+    (f) => !f.context && !isMigrationFinding(f) && order.indexOf(f.severity) <= thresholdIdx
   );
 }

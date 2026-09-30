@@ -30,6 +30,8 @@ export interface Coverage {
   handlers: number;
 }
 
+export type Summary = Record<Severity, number>;
+
 export interface ScanResult {
   target: string;
   scannedAt: string;
@@ -38,14 +40,10 @@ export interface ScanResult {
   findings: Finding[];
   warnings?: string[];
   coverage: Coverage;
+  /** Security score; migration-readiness findings are scored separately under `migration`. */
   score: number;
-  summary: {
-    critical: number;
-    high: number;
-    medium: number;
-    low: number;
-    info: number;
-  };
+  summary: Summary;
+  migration: { score: number; summary: Summary };
 }
 
 export interface Target {

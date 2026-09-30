@@ -3,7 +3,7 @@ import { Command } from "commander";
 import { readFileSync, writeFileSync, mkdirSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { scan, hasCriticalOrHighFindings } from "./scanner.js";
+import { scan, hasCriticalOrHighFindings, isMigrationFinding } from "./scanner.js";
 import { toJSON, auditToJSON } from "./reporters/json-reporter.js";
 import { toMarkdown, auditToMarkdown } from "./reporters/markdown-reporter.js";
 import { toSARIF } from "./reporters/sarif-reporter.js";
@@ -143,7 +143,7 @@ function formatResult(
 }
 
 function printSummary(result: ReturnType<typeof scan> extends Promise<infer R> ? R : never): void {
-  const { score, summary, findings, coverage } = result as Awaited<ReturnType<typeof scan>>;
+  const { score, summary, findings, coverage, migration } = result as Awaited<ReturnType<typeof scan>>;
   if (!coverage.assessed) {
     console.error("\nNot assessed: the scanner could not analyze this target, so the score is not meaningful.");
     return;
@@ -151,6 +151,9 @@ function printSummary(result: ReturnType<typeof scan> extends Promise<infer R> ?
   console.error(
     `\nScore: ${score}/100 | Critical: ${summary.critical} | High: ${summary.high} | Medium: ${summary.medium} | Low: ${summary.low}`
   );
+  if (findings.some((f) => !f.context && isMigrationFinding(f))) {
+    console.error(`Migration readiness: ${migration.score}/100`);
+  }
   if (findings.length === 0) {
     console.error("No issues found ✅");
   }

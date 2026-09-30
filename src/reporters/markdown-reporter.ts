@@ -9,7 +9,7 @@ const SEVERITY_ICON: Record<Severity, string> = {
 };
 
 export function toMarkdown(result: ScanResult): string {
-  const { target, scannedAt, filesScanned, score, summary, findings, coverage } = result;
+  const { target, scannedAt, filesScanned, score, summary, findings, coverage, migration } = result;
   const lines: string[] = [];
 
   lines.push(`# MCPeek Security Report`);
@@ -17,6 +17,7 @@ export function toMarkdown(result: ScanResult): string {
   lines.push(`**Scanned:** ${new Date(scannedAt).toUTCString()}`);
   lines.push(`**Files scanned:** ${filesScanned}`);
   lines.push(coverage.assessed ? `**Security score:** ${score}/100` : `**Security score:** not assessed`);
+  if (Object.values(migration.summary).some((n) => n > 0)) lines.push(`**Migration readiness:** ${migration.score}/100`);
   lines.push(`**Coverage:** ${coverage.handlers} handlers in ${coverage.filesAnalyzed} files; skipped ${coverage.skipped.tests} test/example, ${coverage.skipped.vendored} vendored`);
   const unsupported = Object.entries(coverage.unsupported);
   if (unsupported.length > 0) lines.push(`**Not analyzed:** ${unsupported.map(([l, n]) => `${l} (${n})`).join(", ")}`);
