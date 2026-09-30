@@ -6,7 +6,7 @@
 
 Source-code security scanner for MCP (Model Context Protocol) server implementations.
 
-Unlike config/runtime scanners, `mcpeek` reads your source code and detects vulnerabilities at the AST level — understanding MCP SDK patterns like `server.tool()` and `server.setRequestHandler()` and tracking taint from handler parameters to dangerous sinks.
+Unlike config/runtime scanners, `mcpeek` reads your source code and detects vulnerabilities at the AST level — understanding MCP SDK patterns like `server.tool()`, `server.registerTool()` and `server.setRequestHandler()` and tracking taint from handler parameters to dangerous sinks.
 
 ## Quick start
 
