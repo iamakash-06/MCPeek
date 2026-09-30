@@ -67,6 +67,27 @@ function hasHostValidation(scope: Node): boolean {
   return false;
 }
 
+const NODE_HTTP_MODULES = new Set(["http", "https", "node:http", "node:https"]);
+
+function isLocalHttpClient(call: Node): boolean {
+  const callee = call.asKind(SyntaxKind.CallExpression)?.getExpression();
+  const receiver = callee?.asKind(SyntaxKind.PropertyAccessExpression)?.getExpression();
+  if (!receiver?.isKind(SyntaxKind.Identifier) || !/^https?$/.test(receiver.getText())) return false;
+  try {
+    return receiver.getDefinitionNodes().some((def) => {
+      const decl = def.asKind(SyntaxKind.ImportSpecifier) ?? def.asKind(SyntaxKind.NamespaceImport) ?? def.asKind(SyntaxKind.ImportClause);
+      if (decl) {
+        const spec = decl.getFirstAncestorByKind(SyntaxKind.ImportDeclaration)?.getModuleSpecifierValue();
+        return !!spec && !NODE_HTTP_MODULES.has(spec);
+      }
+      const init = def.asKind(SyntaxKind.VariableDeclaration)?.getInitializer();
+      return !!init && !/require\(\s*["'](node:)?https?["']\s*\)/.test(init.getText());
+    });
+  } catch {
+    return false;
+  }
+}
+
 function scanBody(
   body: Node,
   tainted: TaintMap,
@@ -80,6 +101,7 @@ function scanBody(
   for (const call of body.getDescendantsOfKind(SyntaxKind.CallExpression)) {
     const callText = call.getExpression().getText();
     if (!HTTP_CALLEE_PATTERNS.some((p) => p.test(callText))) continue;
+    if (isLocalHttpClient(call)) continue;
 
     const args = call.getArguments();
     if (args.length === 0) continue;

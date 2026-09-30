@@ -38,6 +38,24 @@ export function detectCommandInjection(
   return findings;
 }
 
+function isRegExpReceiver(expr: Node): boolean {
+  const isRegExp = (n: Node) =>
+    n.isKind(SyntaxKind.RegularExpressionLiteral) ||
+    (n.isKind(SyntaxKind.NewExpression) && n.getExpression().getText() === "RegExp");
+  if (isRegExp(expr)) return true;
+  if (!expr.isKind(SyntaxKind.Identifier)) return false;
+  try {
+    return expr
+      .getDefinitionNodes()
+      .some((d) => {
+        const init = d.asKind(SyntaxKind.VariableDeclaration)?.getInitializer();
+        return !!init && isRegExp(init);
+      });
+  } catch {
+    return false;
+  }
+}
+
 function scanBody(
   body: Node,
   tainted: TaintMap,
@@ -51,6 +69,8 @@ function scanBody(
     const callText = call.getExpression().getText();
     const funcName = callText.split(".").pop() ?? callText;
     if (!DANGEROUS_SINKS.has(funcName)) continue;
+    const receiver = call.getExpression().asKind(SyntaxKind.PropertyAccessExpression)?.getExpression();
+    if (receiver && isRegExpReceiver(receiver)) continue;
 
     const args = call.getArguments();
     if (args.length === 0) continue;
