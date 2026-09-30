@@ -119,3 +119,26 @@ describe("v1 / v2 parity", () => {
     expect(v2).toEqual(v1);
   });
 });
+
+describe("v2 spec fixtures", () => {
+  const scanFixture = async (dir: string) => {
+    const { findings } = await analyzeTypeScript(join(__dirname, "fixtures", dir), { includeTests: true });
+    return findings.map((f) => f.rule).sort();
+  };
+
+  it("reports every v2 rule on the vulnerable server", async () => {
+    expect(await scanFixture("vulnerable-v2-spec")).toEqual([
+      "mcp-apps-html-xss",
+      "mcp-hardcoded-credential",
+      "mcp-header-sensitive",
+      "mcp-meta-authz",
+      "mcp-requeststate-secret",
+      "mcp-requeststate-unbound",
+      "mcp-requeststate-weak-key",
+    ]);
+  });
+
+  it("reports nothing on the hardened twin", async () => {
+    expect(await scanFixture("hardened-v2-spec")).toEqual([]);
+  });
+});
