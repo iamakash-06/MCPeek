@@ -54,6 +54,12 @@ npx mcpeek scan ./my-server --format sarif --output findings.sarif
 | `mcp-hardcoded-credential` | High | CWE-798 | API key / token / secret hardcoded in source or committed `.env` files |
 | `mcp-weak-input-validation` | Medium | CWE-20 | Schema uses `z.any()` / `z.unknown()` |
 | `mcp-weak-schema-bounds` | Medium | CWE-20 | Zod schema accepts user input without size, range, or pattern bounds |
+| `mcp-requeststate-unbound` | High | CWE-345 | `createRequestStateCodec` without a `bind` callback |
+| `mcp-requeststate-weak-key` | High / Medium | CWE-321 / CWE-320 | requestState codec key hardcoded, or generated per process |
+| `mcp-requeststate-secret` | High | CWE-312 | Secret-looking data passed to `codec.mint()` (signed, not encrypted) |
+| `mcp-meta-authz` | Medium | CWE-807 | `_meta` or request headers used in an authorization or identity decision |
+| `mcp-header-sensitive` | Medium | CWE-200 | `x-mcp-header` mirrors a secret-looking argument into an HTTP header |
+| `mcp-apps-html-xss` | High | CWE-79 | MCP Apps HTML resource built from unescaped tool input |
 
 Each finding includes a `taintChain` showing how user input reaches the sink — e.g. `cmd (handler param) → command (line 3) → execSync() (line 5)`.
 
