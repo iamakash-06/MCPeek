@@ -18,7 +18,7 @@ export async function scan(
   const { path, cleanup } = await fetchRepo(target);
 
   try {
-    const { findings: codeFindings, filesScanned } = await analyzeTypeScript(path, options);
+    const { findings: codeFindings, filesScanned, warnings } = await analyzeTypeScript(path, options);
 
     // Dotenv scanning is independent of the TS Program — a committed .env can
     // leak secrets even in a repo with zero TypeScript files (filesScanned: 0).
@@ -36,6 +36,7 @@ export async function scan(
       language: filesScanned === 0 ? "unknown" : "typescript",
       filesScanned,
       findings,
+      warnings,
       score,
       summary,
     };
