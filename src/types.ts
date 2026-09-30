@@ -25,6 +25,7 @@ export interface ScanResult {
   language: "typescript" | "javascript" | "unknown";
   filesScanned: number;
   findings: Finding[];
+  warnings?: string[];
   score: number;
   summary: {
     critical: number;
