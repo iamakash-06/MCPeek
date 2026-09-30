@@ -17,6 +17,7 @@ import { detectRequestState } from "./rules/request-state.js";
 import { detectSensitiveHeaderMapping } from "./rules/header-sensitive.js";
 import { detectUntrustedContextAuthz } from "./rules/untrusted-context.js";
 import { detectRequestStateAuthzGap } from "./rules/requeststate-authz.js";
+import { detectSessionKeyedState } from "./rules/session-state.js";
 import { detectAppsHtmlXss } from "./rules/apps-xss.js";
 
 export type RuleName =
@@ -33,7 +34,8 @@ export type RuleName =
   | "header-sensitive"
   | "meta-authz"
   | "apps-xss"
-  | "requeststate-authz";
+  | "requeststate-authz"
+  | "session-state";
 
 export const ALL_RULES: RuleName[] = [
   "command-injection",
@@ -50,6 +52,7 @@ export const ALL_RULES: RuleName[] = [
   "meta-authz",
   "apps-xss",
   "requeststate-authz",
+  "session-state",
 ];
 
 export interface AnalyzeResult {
@@ -208,6 +211,8 @@ function runRule(
       return detectUntrustedContextAuthz(sourceFile);
     case "requeststate-authz":
       return detectRequestStateAuthzGap(sourceFile, handlerOptions);
+    case "session-state":
+      return detectSessionKeyedState(sourceFile);
     case "apps-xss":
       return detectAppsHtmlXss(sourceFile, handlerOptions);
   }
