@@ -12,6 +12,10 @@ import { detectWeakSchemaBounds } from "./rules/weak-schema-bounds.js";
 import { detectToolPoisoning } from "./rules/tool-poisoning.js";
 import { detectSqlInjection } from "./rules/sql-injection.js";
 import { detectCodeInjection } from "./rules/code-injection.js";
+import { detectRequestState } from "./rules/request-state.js";
+import { detectSensitiveHeaderMapping } from "./rules/header-sensitive.js";
+import { detectUntrustedContextAuthz } from "./rules/untrusted-context.js";
+import { detectAppsHtmlXss } from "./rules/apps-xss.js";
 
 export type RuleName =
   | "command-injection"
@@ -22,7 +26,11 @@ export type RuleName =
   | "weak-schema-bounds"
   | "tool-poisoning"
   | "sql-injection"
-  | "code-injection";
+  | "code-injection"
+  | "request-state"
+  | "header-sensitive"
+  | "meta-authz"
+  | "apps-xss";
 
 export const ALL_RULES: RuleName[] = [
   "command-injection",
@@ -34,6 +42,10 @@ export const ALL_RULES: RuleName[] = [
   "tool-poisoning",
   "sql-injection",
   "code-injection",
+  "request-state",
+  "header-sensitive",
+  "meta-authz",
+  "apps-xss",
 ];
 
 export interface AnalyzeResult {
@@ -138,6 +150,14 @@ function runRule(
       return detectSqlInjection(sourceFile, handlerOptions);
     case "code-injection":
       return detectCodeInjection(sourceFile, handlerOptions);
+    case "request-state":
+      return detectRequestState(sourceFile);
+    case "header-sensitive":
+      return detectSensitiveHeaderMapping(sourceFile);
+    case "meta-authz":
+      return detectUntrustedContextAuthz(sourceFile);
+    case "apps-xss":
+      return detectAppsHtmlXss(sourceFile, handlerOptions);
   }
 }
 
