@@ -2,7 +2,7 @@ import { Project } from "ts-morph";
 import { existsSync } from "fs";
 import { join } from "path";
 import type { Finding, ScanOptions } from "../types.js";
-import type { HandlerScanOptions } from "./mcp-handler.js";
+import { findMCPToolHandlers, type HandlerScanOptions } from "./mcp-handler.js";
 import { detectCommandInjection } from "./rules/command-injection.js";
 import { detectMissingInputValidation } from "./rules/input-validation.js";
 import { detectHardcodedCredentials } from "./rules/credential-hardcoding.js";
@@ -51,7 +51,10 @@ export const ALL_RULES: RuleName[] = [
 export interface AnalyzeResult {
   findings: Finding[];
   filesScanned: number;
+  warnings: string[];
 }
+
+const SDK_IMPORT_RE = /from\s+["']@modelcontextprotocol\/(sdk|server)/;
 
 export async function analyzeTypeScript(
   projectRoot: string,
@@ -109,8 +112,16 @@ export async function analyzeTypeScript(
   };
 
   const allFindings: Finding[] = [];
+  let importsSdk = false;
+  let handlersEntered = 0;
 
   for (const sourceFile of sourceFiles) {
+    importsSdk ||= SDK_IMPORT_RE.test(sourceFile.getFullText());
+    try {
+      handlersEntered += findMCPToolHandlers(sourceFile, handlerOptions).length;
+    } catch {
+      // Skip files that fail to parse
+    }
     for (const rule of activeRules) {
       try {
         allFindings.push(...runRule(rule, sourceFile, handlerOptions));
@@ -120,9 +131,17 @@ export async function analyzeTypeScript(
     }
   }
 
+  const warnings =
+    importsSdk && handlersEntered === 0
+      ? [
+          "MCP SDK imported but no tool handlers were detected; taint rules did not run. Tools may be registered through a wrapper, so try --registrations <name>.",
+        ]
+      : [];
+
   return {
     findings: deduplicateFindings(allFindings),
     filesScanned: sourceFiles.length,
+    warnings,
   };
 }
 
@@ -202,7 +221,11 @@ function findTsConfig(root: string): string | undefined {
 
 function deduplicateFindings(findings: Finding[]): Finding[] {
   const seen = new Set<string>();
+  const weakKeys = new Set(
+    findings.filter((f) => f.rule === "mcp-requeststate-weak-key").map((f) => `${f.file}:${f.line}`)
+  );
   return findings.filter((f) => {
+    if (f.rule === "mcp-hardcoded-credential" && weakKeys.has(`${f.file}:${f.line}`)) return false;
     const key = `${f.rule}:${f.file}:${f.line}`;
     if (seen.has(key)) return false;
     seen.add(key);
