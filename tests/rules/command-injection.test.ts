@@ -337,4 +337,17 @@ describe("command-injection rule", () => {
     const findings = detectCommandInjection(sf);
     expect(findings).toHaveLength(0);
   });
+
+  it("does not flag RegExp.exec", () => {
+    const sf = makeProject(`
+      const RE = /^a:(.*)$/;
+      server.registerTool("t", { inputSchema: { q: z.string() } }, async ({ q }) => {
+        /^x:(.*)$/.exec(q);
+        RE.exec(q);
+        new RegExp("a").exec(q);
+        return { content: [] };
+      });
+    `);
+    expect(detectCommandInjection(sf)).toHaveLength(0);
+  });
 });

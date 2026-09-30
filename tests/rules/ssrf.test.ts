@@ -70,4 +70,27 @@ describe("ssrf rule", () => {
     `);
     expect(detectSSRF(sf).length).toBeGreaterThanOrEqual(1);
   });
+
+  it("does not treat a local http client as node:http", () => {
+    const sf = makeProject(`
+      import { http } from "./http";
+      server.tool("t", { id: z.string() }, async ({ id }) => {
+        await http.get(["v2/redis", id]);
+        return { content: [] };
+      });
+    `);
+    expect(detectSSRF(sf)).toHaveLength(0);
+  });
+
+  it("still flags node:http and unresolved http", () => {
+    const real = makeProject(`
+      import http from "node:http";
+      server.tool("t", { u: z.string() }, async ({ u }) => { http.get(u); return { content: [] }; });
+    `);
+    const unresolved = makeProject(`
+      server.tool("t", { u: z.string() }, async ({ u }) => { http.get(u); return { content: [] }; });
+    `);
+    expect(detectSSRF(real)).toHaveLength(1);
+    expect(detectSSRF(unresolved)).toHaveLength(1);
+  });
 });
