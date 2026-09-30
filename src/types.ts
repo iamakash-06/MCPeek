@@ -19,6 +19,15 @@ export interface Finding {
   taintChain?: string[];
 }
 
+export interface Coverage {
+  /** False when the scan could not meaningfully assess the target, so the score is not a clean bill of health. */
+  assessed: boolean;
+  filesAnalyzed: number;
+  skipped: { tests: number; vendored: number };
+  unsupported: Record<string, number>;
+  handlers: number;
+}
+
 export interface ScanResult {
   target: string;
   scannedAt: string;
@@ -26,6 +35,7 @@ export interface ScanResult {
   filesScanned: number;
   findings: Finding[];
   warnings?: string[];
+  coverage: Coverage;
   score: number;
   summary: {
     critical: number;
