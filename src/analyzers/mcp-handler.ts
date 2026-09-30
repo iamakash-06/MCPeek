@@ -66,12 +66,24 @@ function resolveHandlerFunction(node: Node): HandlerFn | undefined {
   return undefined;
 }
 
+const CONFIG_REGISTRATIONS: Record<string, { config: number; key: string }> = {
+  registerTool: { config: 1, key: "inputSchema" },
+  registerPrompt: { config: 1, key: "argsSchema" },
+  registerAppTool: { config: 2, key: "inputSchema" },
+};
+
+const RESOURCE_REGISTRATIONS = new Set(["registerResource", "registerAppResource"]);
+
+function lastSegment(text: string): string {
+  return text.split(".").pop() ?? text;
+}
+
 export function getRegisterToolInputSchema(call: CallExpression): Node | undefined {
-  const config = call.getArguments()[1];
+  const spec = CONFIG_REGISTRATIONS[lastSegment(call.getExpression().getText())];
+  const config = spec && call.getArguments()[spec.config];
   if (!config) return undefined;
   const obj = resolveSchemaDefinition(config).asKind(SyntaxKind.ObjectLiteralExpression);
-  if (!obj) return undefined;
-  const prop = obj.getProperty("inputSchema");
+  const prop = obj?.getProperty(spec.key);
   if (!prop) return undefined;
   if (Node.isPropertyAssignment(prop)) return prop.getInitializer();
   if (Node.isShorthandPropertyAssignment(prop)) return prop.getNameNode();
@@ -85,12 +97,13 @@ function isMCPRegistration(text: string, extraRegistrations: string[]): boolean 
     text.endsWith(".addTool") ||
     text.endsWith(".registerTool") ||
     text === "server.tool" ||
+    lastSegment(text) in CONFIG_REGISTRATIONS ||
+    RESOURCE_REGISTRATIONS.has(lastSegment(text)) ||
     text === "server.setRequestHandler"
   ) {
     return true;
   }
-  const lastSegment = text.split(".").pop() ?? text;
-  return extraRegistrations.some((name) => text === name || lastSegment === name);
+  return extraRegistrations.some((name) => text === name || lastSegment(text) === name);
 }
 
 export function findMCPToolHandlers(
@@ -120,14 +133,19 @@ export function findMCPToolHandlers(
     // MCP handlers receive a single destructured input object as their first param.
     // Slice to 1 to avoid treating the SDK context object as user-controlled input,
     // unless taintContextParam opts in to modeling the second param too (L6).
-    // v2 registerTool without inputSchema calls the handler with (extra) only.
+    // v2 registerTool / registerPrompt without a schema call the handler with (extra) only.
+    const spec = CONFIG_REGISTRATIONS[lastSegment(text)];
     const noInput =
-      text.endsWith(".registerTool") &&
-      resolveSchemaDefinition(args[1]).isKind(SyntaxKind.ObjectLiteralExpression) &&
+      !!spec &&
+      resolveSchemaDefinition(args[spec.config] ?? lastArg).isKind(SyntaxKind.ObjectLiteralExpression) &&
       !getRegisterToolInputSchema(call);
     const params = noInput ? [] : handlerFn.getParameters();
     const paramNames: string[] = [];
-    const paramLimit = options.taintContextParam ? 2 : 1;
+    const paramLimit = RESOURCE_REGISTRATIONS.has(lastSegment(text))
+      ? 2
+      : options.taintContextParam
+        ? 2
+        : 1;
 
     for (const param of params.slice(0, paramLimit)) {
       const binding = param.getNameNode();
