@@ -34,41 +34,31 @@ const ALL_RULES = [
   "mcp-migration-unbounded-sdk-range",
 ];
 
-describe("MCP Dev Summit Toronto showcase", () => {
+describe("MCP Dev Summit Toronto demo server", () => {
   let vulnerable: ScanResult;
-  let clean: ScanResult;
 
   beforeAll(async () => {
-    vulnerable = await scan(join(root, "vulnerable-v1"));
-    clean = await scan(join(root, "clean-v2"));
+    vulnerable = await scan(root);
   });
 
-  it("vulnerable-v1 triggers every rule", () => {
+  it("the server triggers every rule", () => {
     const fired = new Set(vulnerable.findings.map((f) => f.rule));
     expect(ALL_RULES.filter((r) => !fired.has(r))).toEqual([]);
   });
 
-  it("vulnerable-v1 fails the security score and the migration score", () => {
+  it("the server fails the security score and the migration score", () => {
     expect(vulnerable.score).toBeLessThan(20);
     expect(vulnerable.summary.critical).toBeGreaterThan(0);
     expect(vulnerable.migration.score).toBeLessThan(100);
   });
 
-  it("vulnerable-v1 is not skipped as example or test code", () => {
+  it("the server is not skipped as example or test code", () => {
     expect(vulnerable.findings.every((f) => !f.context)).toBe(true);
     expect(vulnerable.coverage.assessed).toBe(true);
   });
 
-  it("vulnerable-v1 traces taint across files", () => {
+  it("the server traces taint across files", () => {
     const sql = vulnerable.findings.find((f) => f.rule === "mcp-sql-injection" && f.file.endsWith("db.ts"));
     expect(sql?.taintChain?.length).toBeGreaterThan(1);
-  });
-
-  it("clean-v2 has no findings and a perfect score on both axes", () => {
-    expect(clean.findings).toEqual([]);
-    expect(clean.score).toBe(100);
-    expect(clean.migration.score).toBe(100);
-    expect(clean.coverage.assessed).toBe(true);
-    expect(clean.coverage.handlers).toBeGreaterThan(10);
   });
 });

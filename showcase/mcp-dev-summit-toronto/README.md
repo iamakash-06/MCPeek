@@ -1,48 +1,44 @@
-# MCP Dev Summit Toronto: MCPeek showcase
+# MCP Dev Summit Toronto: vulnerable server (MCPeek demo target)
 
-Two backends for the same fictional conference, built to show MCPeek end to end.
+A deliberately vulnerable MCP backend for a fictional conference where speakers manage sessions and attendees register and pay. It exists to be scanned with [MCPeek](https://github.com/iamakash-06/MCPeek). It trips all 25 MCPeek rules, including the migration-readiness checks.
 
-| | `vulnerable-v1/` | `clean-v2/` |
-|---|---|---|
-| Story | The rushed first build. v1 SDK, per-session carts, server-pushed prompts, and a half-finished move to v2. | The same product after migration and a security pass. |
-| SDK | `@modelcontextprotocol/sdk` (`*`) plus `@modelcontextprotocol/server` (`latest`) | `@modelcontextprotocol/server` (`^2.0.0`) only |
-| Security score | 0/100 | 100/100 |
-| Migration score | 81/100 | 100/100 |
-| `--ci` exit code | 1 | 0 |
-| Rules fired | all 25 | none |
+**Do not deploy it.** Nothing here is meant to run, and every secret in it is fake.
 
-Both expose the same features, so you can diff them side by side:
-
-- **Speakers** submit a session, upload slides, import a headshot, filter the schedule, and read the guidelines.
-- **Attendees** search sessions, look up a badge, buy a ticket, and cancel a registration.
-- **Organisers** export the attendee list and refund tickets.
-- **MCP Apps** render a ticket card in the host.
-
-Nothing here is meant to run. The packages are not installed, and the vulnerable server must never be deployed. All secrets in `vulnerable-v1` are fake.
-
-## Try it
+## Run the demo
 
 ```bash
-npm run build                       # once, from the repo root
-
-node dist/cli.js scan showcase/mcp-dev-summit-toronto/vulnerable-v1
-node dist/cli.js scan showcase/mcp-dev-summit-toronto/clean-v2
-
-# CI gate: exits 1 on the vulnerable server, 0 on the clean one
-node dist/cli.js scan showcase/mcp-dev-summit-toronto/vulnerable-v1 --ci --fail-on high
-
-# Only the migration checks
-node dist/cli.js scan showcase/mcp-dev-summit-toronto/vulnerable-v1 --rules migration,session-state
-
-# SARIF for GitHub Code Scanning
-node dist/cli.js scan showcase/mcp-dev-summit-toronto/vulnerable-v1 --format sarif --output summit.sarif
+# Point MCPeek at the repo (use a full URL or an absolute path, not `.`)
+npx mcpeek scan https://github.com/<you>/<this-repo>
+npx mcpeek scan "$PWD"
 ```
 
-`npx vitest run tests/showcase.test.ts` asserts that the vulnerable server trips every rule and the clean one trips none.
+The output types to show:
 
-> The showcase lives outside any `examples/`, `demos/` or `fixtures/` folder on purpose. MCPeek tags findings in those paths as example or test code and leaves them out of the score and the CI gate.
+```bash
+# 1. Terminal report (default): scores, severity table, taint chains, remediation
+npx mcpeek scan "$PWD"
 
-## What is wrong in `vulnerable-v1`, and where
+# 2. Migration readiness only
+npx mcpeek scan "$PWD" --rules migration,session-state
+
+# 3. One class of bug
+npx mcpeek scan "$PWD" --rules sql-injection,command-injection
+
+# 4. JSON, for scripts
+npx mcpeek scan "$PWD" --format json
+
+# 5. SARIF, for GitHub Code Scanning
+npx mcpeek scan "$PWD" --format sarif --output summit.sarif
+
+# 6. CI gate: exits 1 because of the critical and high findings
+npx mcpeek scan "$PWD" --ci --fail-on high; echo "exit code: $?"
+```
+
+Expected result: security score **0/100**, migration readiness **81/100**, 4 critical, 14 high and 7 medium findings, 15 handlers analyzed.
+
+> Keep this folder out of any path named `examples/`, `demos/`, `samples/`, `guides/`, `test/` or `fixtures/`. MCPeek tags findings there as example or test code and leaves them out of the score and the CI gate.
+
+## What is wrong, and where
 
 ### Classic server vulnerabilities (`src/index.ts`, `src/db.ts`, `.env`)
 
@@ -72,7 +68,7 @@ node dist/cli.js scan showcase/mcp-dev-summit-toronto/vulnerable-v1 --format sar
 
 ### v2 features used badly (`src/checkout.ts`, `src/ticket-card.ts`)
 
-This is the realistic middle state: checkout was moved to v2 first, and the new primitives were misused.
+Checkout was moved to v2 first, and the new primitives were misused.
 
 | Where | Rule | Problem |
 |---|---|---|
@@ -85,23 +81,3 @@ This is the realistic middle state: checkout was moved to v2 first, and the new 
 | `issueReceipt` | `mcp-signed-token-secret` | Payment token inside a JWT payload |
 | `ticket_card` HTML | `mcp-apps-html-xss` | Display name interpolated unescaped |
 | `ticket_card` CSP | `mcp-apps-wildcard-csp` | `connectDomains: ["*"]`, `resourceDomains: ["https:"]` |
-
-## How `clean-v2` fixes each one
-
-- **Same tools, bounded inputs.** Every field has a type, length and format bound. Enums replace free text wherever the set is closed.
-- **No shell, no eval.** `filter_schedule` takes two enums as bind parameters. `export_attendees` runs a fixed binary with `execFile`, with a format from a lookup table and a server-generated file name.
-- **SQL uses bind parameters only**, including the helper in `db.ts`.
-- **Slides** use `path.basename`, then `path.resolve` plus a prefix check against the slides folder.
-- **Headshots** require https and a host on `ALLOWED_HEADSHOT_HOSTS`, with redirects disabled.
-- **Stateless.** No session maps and no session id generator. Carts and confirmations ride in `requestState`.
-- **Push becomes pull.** `buy_ticket` returns `inputRequired` with an elicitation, then charges on the retried call.
-- **`requestState` is bound and keyed from the environment** (`src/state.ts`), and holds only a step and an id.
-- **Authority comes from `ctx.http.authInfo`.** `_meta` and headers are never trusted, and ownership is re-checked before every mutation.
-- **Receipts carry an opaque id** in the JWT, never payment data.
-- **The ticket card escapes its HTML** and lists exact CSP origins.
-- **Secrets come from the environment.** `.env` is git-ignored and `.env.example` holds placeholders.
-- **Dependencies:** only `@modelcontextprotocol/server`, with a caret range below the next major.
-
-## Keeping the showcase honest
-
-`tests/showcase.test.ts` carries the list of every MCPeek rule. When a new rule ships, add it to that list and add the matching flaw to `vulnerable-v1`. The test fails until you do.
