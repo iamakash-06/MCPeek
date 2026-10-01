@@ -1,0 +1,15 @@
+{
+  "name": "summit-toronto-vulnerable",
+  "version": "0.3.0",
+  "private": true,
+  "description": "MCP Dev Summit Toronto backend: the legacy v1 build. Intentionally vulnerable demo target for MCPeek. Do not deploy.",
+  "type": "module",
+  "main": "src/index.ts",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "*",
+    "@modelcontextprotocol/server": "latest",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.0",
+    "zod": "^3.25.0"
+  }
+}
